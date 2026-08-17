@@ -1,0 +1,145 @@
+// Growth Command Center — v1 data model.
+// Enums are modeled as String (not Prisma `enum`) — a holdover from when this
+// ran on SQLite, kept for schema stability. The canonical value sets live in
+// lib/types.ts.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")       // pooled connection, used at runtime
+  directUrl = env("DATABASE_URL_UNPOOLED") // direct connection, used for migrations
+}
+
+model MockMention {
+  id           String   @id @default(cuid())
+  authorHandle String
+  authorName   String
+  text         String
+  likes        Int      @default(0)
+  replyCount   Int      @default(0)
+  postedAt     DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  conversation Conversation?
+}
+
+model Conversation {
+  id               String   @id @default(cuid())
+  sourceMentionId  String   @unique
+  sourceMention    MockMention @relation(fields: [sourceMentionId], references: [id])
+
+  authorHandle     String
+  authorName       String
+  originalText     String
+  likes            Int      @default(0)
+  replyCount       Int      @default(0)
+
+  intent           String   // HIGH | MEDIUM | LOW
+  topic            String
+  potentialCustomer Boolean @default(false)
+
+  riskTier         String   // AUTO | APPROVAL | NEVER
+  matchedKeywords  String? // comma-separated keyword pre-filter hits, if any
+  aiRiskReasoning  String?
+
+  aiDraftReply     String?  // null when riskTier = NEVER
+  recommendedAction String
+
+  status           String   @default("NEW") // NEW | DRAFTED | REPLIED | IGNORED
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  approvals        Approval[]
+
+  @@index([status])
+  @@index([intent])
+  @@index([riskTier])
+}
+
+model Post {
+  id            String    @id @default(cuid())
+  content       String
+  platform      String    @default("X")
+  status        String    @default("DRAFT") // DRAFT | SCHEDULED | PUBLISHED
+  simulated     Boolean   @default(true)
+  scheduledFor  DateTime?
+  publishedAt   DateTime?
+  platformPostId String?
+  publishedUrl  String?
+
+  sourceTrendId String?
+  sourceTrend   TrendInput? @relation(fields: [sourceTrendId], references: [id])
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  approvals     Approval[]
+
+  @@index([status])
+}
+
+model Approval {
+  id             String   @id @default(cuid())
+  type           String   // POST | REPLY | COMMUNITY_INVITE
+  status         String   @default("PENDING") // PENDING | APPROVED | REJECTED | EDITED
+  platform       String   @default("X")
+
+  content        String
+  editedContent  String?
+  aiReasoning    String
+  confidence     Float
+  riskTier       String   // AUTO | APPROVAL | NEVER
+
+  conversationId String?
+  conversation   Conversation? @relation(fields: [conversationId], references: [id])
+  postId         String?
+  post           Post?    @relation(fields: [postId], references: [id])
+
+  resolvedAt     DateTime?
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status])
+}
+
+model AgentRun {
+  id           String    @id @default(cuid())
+  triggeredBy  String    @default("MANUAL") // MANUAL | CRON
+  status       String    @default("RUNNING") // RUNNING | COMPLETED | FAILED
+  summary      String?
+  error        String?
+  startedAt    DateTime  @default(now())
+  completedAt  DateTime?
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model DailySnapshot {
+  id             String   @id @default(cuid())
+  date           DateTime @unique
+  newFollowers   Int
+  waitlistSignups Int
+  isDemoData     Boolean  @default(true)
+
+  createdAt      DateTime @default(now())
+}
+
+model TrendInput {
+  id              String    @id @default(cuid())
+  topic           String
+  rawSignal       String    // seeded raw context (e.g. a tweet snippet or news blurb)
+  summary         String?   // filled in by the Trend Agent
+  riskTier        String?   // AUTO | NEVER — keyword-filter result on the trend itself
+  matchedKeywords String?
+  processedAt     DateTime?
+  createdAt       DateTime  @default(now())
+
+  posts           Post[]
+}
