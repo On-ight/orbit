@@ -34,7 +34,7 @@ Open [http://localhost:3000](http://localhost:3000). You'll be redirected to
 |---|---|
 | `DATABASE_URL` | Pooled Postgres connection string |
 | `DATABASE_URL_UNPOOLED` | Direct Postgres connection string, used only for running migrations |
-| `OPENAI_API_KEY` | Powers the three agents (`gpt-5.6-luna` by default — cheap, swap the `LLM_MODEL` constant in `lib/agents/llm-client.ts` for higher quality). Without it, agent runs still complete but every item fails safe to the flagged/`NEVER` risk tier (see Settings page). |
+| `ANTHROPIC_API_KEY` | Powers the three agents. Without it, agent runs still complete but every item fails safe to the flagged/`NEVER` risk tier (see Settings page). |
 | `DASHBOARD_PASSWORD` | Shared password gating the whole app — change this before sharing the URL with anyone |
 | `SESSION_SECRET` | Signs the session cookie — use a long random string before deploying anywhere real |
 | `X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_SECRET` | OAuth 1.0a user-context credentials for posting to X. Without these, approved posts stay simulated. See below for how to get them. |
@@ -66,10 +66,9 @@ per-user accounts yet.
    some legacy `POSTGRES_*` variables you can ignore) into the project's
    environment variables for you.
 4. **Add the rest of the environment variables** in Project Settings →
-   Environment Variables: `OPENAI_API_KEY`, `DASHBOARD_PASSWORD` (pick a
+   Environment Variables: `ANTHROPIC_API_KEY`, `DASHBOARD_PASSWORD` (pick a
    real one — not `changeme`), `SESSION_SECRET` (a long random string — e.g.
    `openssl rand -hex 32`), and the four `X_*` variables if you've connected X.
-   Paste raw values only — no surrounding quote marks, unlike `.env.local`.
 5. **Generate the first Postgres migration.** This has to happen once, from
    your machine, against the real database — I can't do it without your DB
    credentials, and Vercel's build step only *applies* migrations, it
@@ -113,4 +112,4 @@ the whole "login system" for now.
 
 See `prisma/schema.prisma` for the data model and `lib/agents/` for the three
 agents (`content-agent.ts`, `community-agent.ts`, `trend-agent.ts`) plus the
-shared LLM client (`llm-client.ts`, OpenAI-backed) and risk-tier gate.
+shared Claude client and risk-tier gate.

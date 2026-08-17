@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
-import { callStructuredLLM } from "@/lib/agents/llm-client";
+import { callStructuredClaude } from "@/lib/agents/claude-client";
 
 const draftSchema = z.object({
   content: z.string(),
@@ -40,7 +40,7 @@ export async function runContentAgentOnTrend(trendId: string): Promise<ContentAg
   if (trend.posts.length > 0) return { trendId, ok: true };
 
   try {
-    const draft = await callStructuredLLM({
+    const draft = await callStructuredClaude({
       toolName: "record_post_draft",
       toolDescription: "Records a drafted social post reacting to a trend.",
       inputSchema,

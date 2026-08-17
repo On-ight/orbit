@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
-import { callStructuredLLM, LLMRefusalError } from "@/lib/agents/llm-client";
+import { callStructuredClaude, ClaudeRefusalError } from "@/lib/agents/claude-client";
 import { resolveRiskTier } from "@/lib/agents/risk-tiers";
 import { INTENT_LEVELS, RISK_TIERS } from "@/lib/types";
 
@@ -68,7 +68,7 @@ export async function runCommunityAgentOnMention(mentionId: string): Promise<Com
 
   let analysis: z.infer<typeof analysisSchema>;
   try {
-    analysis = await callStructuredLLM({
+    analysis = await callStructuredClaude({
       toolName: "record_conversation_analysis",
       toolDescription:
         "Records intent analysis and a draft reply for a social mention, including a risk self-assessment.",
@@ -92,7 +92,7 @@ self-assess the risk tier, and draft a reply if appropriate.`,
     // same retry behavior the Trend Agent already uses. A genuinely
     // content-driven refusal will just fail the same way again next time,
     // which is a wasted call, not a safety issue.
-    const message = err instanceof LLMRefusalError ? err.message : String(err);
+    const message = err instanceof ClaudeRefusalError ? err.message : String(err);
     return { mentionId, ok: false, error: message };
   }
 
