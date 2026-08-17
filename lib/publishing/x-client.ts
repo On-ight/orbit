@@ -1,4 +1,4 @@
-import { TwitterApi } from "twitter-api-v2";
+import { ApiResponseError, TwitterApi } from "twitter-api-v2";
 
 export function isXConfigured(): boolean {
   return Boolean(
@@ -40,11 +40,19 @@ export interface PublishedXPost {
  * unless this resolves successfully.
  */
 export async function publishPostToX(content: string): Promise<PublishedXPost> {
-  const result = await getClient().readWrite.v2.tweet(content);
-  const id = result.data.id;
-  return {
-    platformPostId: id,
-    // Generic status URL — resolves correctly without needing the account's handle.
-    url: `https://x.com/i/web/status/${id}`,
-  };
+  try {
+    const result = await getClient().readWrite.v2.tweet(content);
+    const id = result.data.id;
+    return {
+      platformPostId: id,
+      // Generic status URL — resolves correctly without needing the account's handle.
+      url: `https://x.com/i/web/status/${id}`,
+    };
+  } catch (err) {
+    if (err instanceof ApiResponseError) {
+      const detail = JSON.stringify(err.data);
+      throw new Error(`X API error ${err.code}: ${detail}`);
+    }
+    throw err;
+  }
 }
