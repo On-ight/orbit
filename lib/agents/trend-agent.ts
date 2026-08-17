@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
-import { callStructuredClaude } from "@/lib/agents/claude-client";
+import { callStructuredLLM } from "@/lib/agents/llm-client";
 import { runKeywordPreFilter } from "@/lib/agents/risk-tiers";
 
 const summarySchema = z.object({
@@ -50,7 +50,7 @@ export async function runTrendAgentOnInput(trendId: string): Promise<TrendAgentI
   }
 
   try {
-    const result = await callStructuredClaude({
+    const result = await callStructuredLLM({
       toolName: "record_trend_summary",
       toolDescription: "Records a short summary of a trending topic for use in later post drafting.",
       inputSchema,

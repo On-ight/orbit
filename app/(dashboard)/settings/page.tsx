@@ -42,7 +42,7 @@ const TIER_GROUPS: { tier: string; label: string; color: string; actions: string
 export default async function SettingsPage() {
   const [runs, hasApiKey, xConfigured] = await Promise.all([
     prisma.agentRun.findMany({ orderBy: { startedAt: "desc" }, take: 10 }),
-    Promise.resolve(Boolean(process.env.ANTHROPIC_API_KEY)),
+    Promise.resolve(Boolean(process.env.OPENAI_API_KEY)),
     Promise.resolve(isXConfigured()),
   ]);
 
@@ -54,12 +54,12 @@ export default async function SettingsPage() {
         <h2 className="mb-3 text-sm font-semibold text-[var(--text-primary)]">Connections</h2>
         <div className="space-y-2 text-xs">
           <p>
-            Claude API key:{" "}
+            OpenAI API key:{" "}
             <span
               className="font-medium"
               style={{ color: hasApiKey ? "var(--status-good)" : "var(--status-critical)" }}
             >
-              {hasApiKey ? "configured" : "missing — set ANTHROPIC_API_KEY in .env.local"}
+              {hasApiKey ? "configured" : "missing — set OPENAI_API_KEY in .env.local"}
             </span>
           </p>
           <p>
