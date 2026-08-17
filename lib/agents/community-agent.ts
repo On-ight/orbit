@@ -84,29 +84,15 @@ Score the intent, identify the topic, decide if this looks like a potential OnSi
 self-assess the risk tier, and draft a reply if appropriate.`,
     });
   } catch (err) {
-    // Fail-safe invariant: if classification errors for any reason
-    // (rate limit, timeout, refusal), the item must be treated as NEVER,
-    // not silently skipped or defaulted to something more permissive.
+    // Fail-safe invariant: if classification errors for any reason (rate
+    // limit, billing, timeout, refusal), nothing risky may be auto-approved
+    // — but that only requires NOT creating a draft/approval here, not
+    // permanently flagging the mention. Leaving no Conversation record means
+    // the mention stays eligible for reprocessing on the next cycle, the
+    // same retry behavior the Trend Agent already uses. A genuinely
+    // content-driven refusal will just fail the same way again next time,
+    // which is a wasted call, not a safety issue.
     const message = err instanceof ClaudeRefusalError ? err.message : String(err);
-    await prisma.conversation.create({
-      data: {
-        sourceMentionId: mention.id,
-        authorHandle: mention.authorHandle,
-        authorName: mention.authorName,
-        originalText: mention.text,
-        likes: mention.likes,
-        replyCount: mention.replyCount,
-        intent: "LOW",
-        topic: "unclassified",
-        potentialCustomer: false,
-        riskTier: "NEVER",
-        matchedKeywords: null,
-        aiRiskReasoning: `Classification failed, defaulted to NEVER: ${message}`,
-        aiDraftReply: null,
-        recommendedAction: "Flagged — do not auto-draft. Requires manual review.",
-        status: "NEW",
-      },
-    });
     return { mentionId, ok: false, error: message };
   }
 
