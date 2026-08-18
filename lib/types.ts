@@ -18,3 +18,12 @@ export type PostStatus = (typeof POST_STATUSES)[number];
 
 export const AGENT_RUN_STATUSES = ["RUNNING", "COMPLETED", "FAILED"] as const;
 export type AgentRunStatus = (typeof AGENT_RUN_STATUSES)[number];
+
+export const PLATFORMS = ["X", "THREADS", "LINKEDIN"] as const;
+export type Platform = (typeof PLATFORMS)[number];
+
+export const PLATFORM_CHAR_LIMITS: Record<Platform, number> = {
+  X: 280,
+  THREADS: 500,
+  LINKEDIN: 3000,
+};

@@ -9,6 +9,7 @@
     "lint": "eslint",
     "db:seed": "tsx prisma/seed.ts",
     "buffer:channels": "tsx --env-file=.env.local scripts/list-buffer-channels.ts",
+    "kb:seed": "tsx --env-file=.env.local scripts/seed-knowledge-base.ts",
     "postinstall": "prisma generate",
     "vercel-build": "prisma generate && prisma migrate deploy && next build"
   },
@@ -18,6 +19,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",
     "@prisma/client": "^5.22.0",
+    "@vercel/blob": "^2.8.0",
     "next": "16.3.1",
     "prisma": "^5.22.0",
     "react": "19.2.8",

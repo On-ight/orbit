@@ -1,25 +1,15 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { callStructuredClaude } from "@/lib/agents/claude-client";
+import { activeBufferPlatforms, isBufferConfigured, BufferPlatform } from "@/lib/publishing/buffer-client";
+import { PLATFORM_CHAR_LIMITS as PLATFORM_LIMITS } from "@/lib/types";
 
-const draftSchema = z.object({
-  content: z.string().max(280, "X posts cannot exceed 280 characters"),
+const variantSchema = z.object({
+  content: z.string(),
   confidence: z.number().min(0).max(1),
   reasoning: z.string(),
 });
-
-const inputSchema = {
-  type: "object",
-  properties: {
-    content: {
-      type: "string",
-      description: "The full text of the post, ready to publish. Must be 280 characters or fewer — X's hard limit.",
-    },
-    confidence: { type: "number", description: "0 to 1 confidence this post is on-brand and worth publishing" },
-    reasoning: { type: "string", description: "Why this angle, in one or two sentences" },
-  },
-  required: ["content", "confidence", "reasoning"],
-};
+type Variant = z.infer<typeof variantSchema>;
 
 export interface ContentAgentItemResult {
   trendId: string;
@@ -27,59 +17,174 @@ export interface ContentAgentItemResult {
   error?: string;
 }
 
+function platformKey(p: BufferPlatform): string {
+  return p.toLowerCase();
+}
+
+/**
+ * Drafts one adapted variant per requested platform in a single call, then
+ * validates each platform's sub-object independently (safeParse, not the
+ * atomic parse-or-throw callStructuredClaude normally does) — so one bad
+ * platform (e.g. a LinkedIn draft that ran long) doesn't discard drafts for
+ * the other platforms that were actually fine. This mirrors a real lesson
+ * from discover-trends.ts: tool-call outputs with more structure than a flat
+ * object are worth validating defensively rather than trusting blindly.
+ */
+async function draftVariantsForTrend(
+  trend: { topic: string; summary: string },
+  platforms: BufferPlatform[],
+): Promise<{ results: { platform: BufferPlatform; draft: Variant }[]; errors: string[] }> {
+  const properties: Record<string, unknown> = {};
+  const required: string[] = [];
+
+  for (const p of platforms) {
+    const limit = PLATFORM_LIMITS[p];
+    properties[platformKey(p)] = {
+      type: "object",
+      description: `Draft adapted for ${p}`,
+      properties: {
+        content: {
+          type: "string",
+          description: `The full text of the ${p} post, ready to publish. Must be ${limit} characters or fewer — ${p}'s hard limit.`,
+        },
+        confidence: {
+          type: "number",
+          description: "0 to 1 confidence this post is on-brand and worth publishing",
+        },
+        reasoning: { type: "string", description: "Why this angle, in one or two sentences" },
+      },
+      required: ["content", "confidence", "reasoning"],
+    };
+    required.push(platformKey(p));
+  }
+
+  const platformNotes = platforms
+    .map((p) => `- ${p}: ${PLATFORM_LIMITS[p]} character hard limit — aim for well under this, not right up to it`)
+    .join("\n");
+
+  // Loose passthrough schema here on purpose — each platform's sub-object is
+  // validated independently below instead of atomically via callStructuredClaude.
+  const raw = await callStructuredClaude({
+    toolName: "record_platform_drafts",
+    toolDescription: "Records one drafted social post variant per requested platform, adapted to each platform's length and tone.",
+    inputSchema: { type: "object", properties, required },
+    zodSchema: z.record(z.string(), z.unknown()),
+    userMessage: `Draft a post reacting to this trend for OnSight, adapted for each platform below.
+The core idea should be the same across platforms, but fit each one's length and register —
+X and Threads are short and punchy, LinkedIn can be a bit more developed (though still on-brand,
+not corporate) and should front-load the hook since only the first ~140-200 characters show
+before "see more."
+
+Topic: ${trend.topic}
+Trend summary: ${trend.summary}
+
+Platforms to draft for:
+${platformNotes}
+
+No hashtag spam on any platform. Before finishing, count the characters in each platform's
+"content" string individually against its limit above — a platform with a higher limit (like
+Threads or LinkedIn) is not an invitation to write longer by default, and going over means that
+platform's draft gets rejected outright and doesn't get published at all.`,
+  });
+
+  const results: { platform: BufferPlatform; draft: Variant }[] = [];
+  const errors: string[] = [];
+
+  for (const p of platforms) {
+    const limit = PLATFORM_LIMITS[p];
+    // A per-platform object field sometimes comes back JSON-stringified
+    // instead of as a native object — same looseness seen in discover-trends.ts.
+    const perPlatformSchema = z.preprocess(
+      (val) => {
+        if (typeof val === "string") {
+          try {
+            return JSON.parse(val);
+          } catch {
+            return val;
+          }
+        }
+        return val;
+      },
+      z.object({
+        content: z.string().max(limit, `${p} posts cannot exceed ${limit} characters`),
+        confidence: z.number().min(0).max(1),
+        reasoning: z.string(),
+      }),
+    );
+    const parsed = perPlatformSchema.safeParse(raw[platformKey(p)]);
+    if (parsed.success) {
+      results.push({ platform: p, draft: parsed.data });
+    } else {
+      errors.push(`${p}: ${parsed.error.issues.map((i) => i.message).join(", ")}`);
+    }
+  }
+
+  return { results, errors };
+}
+
 /**
  * Drafts a post from a trend the Trend Agent already summarized and cleared
  * (riskTier AUTO). Content generation itself is AUTO-tier, but publishing is
  * always APPROVAL-tier per the action policy, so every draft lands in the
  * approval queue rather than going out directly.
+ *
+ * One trend -> one Post + one Approval per connected platform (not one shared
+ * row) — Post.sourceTrendId is already one-to-many and platform already
+ * exists on both models, so this needed no relation changes. If Buffer isn't
+ * configured for any platform, this falls back to exactly the original
+ * behavior: X-only, via the direct X posting path in the approvals route.
  */
 export async function runContentAgentOnTrend(trendId: string): Promise<ContentAgentItemResult> {
   const trend = await prisma.trendInput.findUnique({
     where: { id: trendId },
-    include: { posts: { select: { id: true } } },
+    include: { posts: { select: { platform: true } } },
   });
   if (!trend) return { trendId, ok: false, error: "Trend input not found" };
   if (trend.riskTier !== "AUTO" || !trend.summary) return { trendId, ok: true };
-  if (trend.posts.length > 0) return { trendId, ok: true };
+
+  const existingPlatforms = new Set(trend.posts.map((p) => p.platform));
+
+  const targetPlatforms: BufferPlatform[] = isBufferConfigured()
+    ? activeBufferPlatforms().filter((p) => !existingPlatforms.has(p))
+    : existingPlatforms.has("X")
+      ? []
+      : ["X"];
+
+  if (targetPlatforms.length === 0) return { trendId, ok: true };
 
   try {
-    const draft = await callStructuredClaude({
-      toolName: "record_post_draft",
-      toolDescription: "Records a drafted social post reacting to a trend.",
-      inputSchema,
-      zodSchema: draftSchema,
-      userMessage: `Draft a short X post reacting to this trend for OnSight.
+    const { results, errors } = await draftVariantsForTrend(
+      { topic: trend.topic, summary: trend.summary },
+      targetPlatforms,
+    );
 
-Topic: ${trend.topic}
-Trend summary: ${trend.summary}
+    for (const { platform, draft } of results) {
+      const post = await prisma.post.create({
+        data: {
+          content: draft.content,
+          platform,
+          status: "DRAFT",
+          sourceTrendId: trend.id,
+        },
+      });
 
-Keep it to 1-3 sentences, on-brand, no hashtag spam. Hard limit: 280 characters
-total, including spaces and punctuation — this is X's post length limit, not a
-suggestion. Count carefully; leave margin rather than write right up to the edge.`,
-    });
+      await prisma.approval.create({
+        data: {
+          type: "POST",
+          platform,
+          content: draft.content,
+          aiReasoning: draft.reasoning,
+          confidence: draft.confidence,
+          riskTier: "APPROVAL",
+          postId: post.id,
+        },
+      });
+    }
 
-    const post = await prisma.post.create({
-      data: {
-        content: draft.content,
-        platform: "X",
-        status: "DRAFT",
-        sourceTrendId: trend.id,
-      },
-    });
-
-    await prisma.approval.create({
-      data: {
-        type: "POST",
-        platform: "X",
-        content: draft.content,
-        aiReasoning: draft.reasoning,
-        confidence: draft.confidence,
-        riskTier: "APPROVAL",
-        postId: post.id,
-      },
-    });
-
-    return { trendId, ok: true };
+    if (results.length === 0) {
+      return { trendId, ok: false, error: errors.join("; ") };
+    }
+    return { trendId, ok: true, error: errors.length > 0 ? errors.join("; ") : undefined };
   } catch (err) {
     return { trendId, ok: false, error: String(err) };
   }

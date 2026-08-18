@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { RiskBadge } from "@/components/dashboard/Badge";
+import { PLATFORM_CHAR_LIMITS, Platform } from "@/lib/types";
 
 export interface ApprovalCardData {
   id: string;
@@ -11,6 +12,7 @@ export interface ApprovalCardData {
   platform: string;
   content: string;
   editedContent: string | null;
+  imageUrl: string | null;
   aiReasoning: string;
   confidence: number;
   riskTier: string;
@@ -24,21 +26,49 @@ const TYPE_LABEL: Record<string, string> = {
   COMMUNITY_INVITE: "🤝 Community invite",
 };
 
+function charLimitFor(platform: string): number {
+  return PLATFORM_CHAR_LIMITS[platform as Platform] ?? 280;
+}
+
 export function ApprovalCard({
   approval,
   xConfigured,
-  bufferConfigured,
+  bufferPlatforms,
 }: {
   approval: ApprovalCardData;
   xConfigured: boolean;
-  bufferConfigured: boolean;
+  bufferPlatforms: string[];
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(approval.editedContent ?? approval.content);
+  const [imageUrl, setImageUrl] = useState(approval.imageUrl ?? "");
+  const [uploading, setUploading] = useState(false);
   const [scheduledFor, setScheduledFor] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const limit = charLimitFor(approval.platform);
+  const bufferConfigured = bufferPlatforms.includes(approval.platform);
+
+  async function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Upload failed");
+      setImageUrl(data.url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setUploading(false);
+    }
+  }
 
   async function act(action: "approve" | "reject" | "edit") {
     setBusy(true);
@@ -50,6 +80,7 @@ export function ApprovalCard({
         body: JSON.stringify({
           action,
           editedContent: action !== "reject" && draft !== approval.content ? draft : undefined,
+          imageUrl: action !== "reject" && imageUrl !== (approval.imageUrl ?? "") ? imageUrl : undefined,
           scheduledFor:
             action === "approve" && bufferConfigured && scheduledFor
               ? new Date(scheduledFor).toISOString()
@@ -70,8 +101,8 @@ export function ApprovalCard({
   }
 
   const displayContent = approval.editedContent ?? approval.content;
-  const canPublishLive = bufferConfigured || (approval.type === "POST" && xConfigured);
-  const overLimit = editing ? draft.length > 280 : displayContent.length > 280;
+  const canPublishLive = bufferConfigured || (approval.type === "POST" && approval.platform === "X" && xConfigured);
+  const overLimit = editing ? draft.length > limit : displayContent.length > limit;
 
   function publishNote(): string {
     if (bufferConfigured) {
@@ -79,10 +110,10 @@ export function ApprovalCard({
         ? `Approving this will schedule it via Buffer for ${new Date(scheduledFor).toLocaleString()}.`
         : "Approving this will queue it via Buffer for the next available slot.";
     }
-    if (approval.type === "POST" && xConfigured) {
+    if (approval.type === "POST" && approval.platform === "X" && xConfigured) {
       return "Approving this will publish it live to X immediately.";
     }
-    return "No publishing connection configured — approving this will only mark it published in the demo pipeline.";
+    return "No publishing connection configured for this platform — approving this will only mark it published in the demo pipeline.";
   }
 
   return (
@@ -113,14 +144,15 @@ export function ApprovalCard({
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            rows={4}
+            rows={approval.platform === "LINKEDIN" ? 8 : 4}
             className="w-full rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
           />
           <p
             className="mt-1 text-right text-xs font-medium"
-            style={{ color: draft.length > 280 ? "var(--status-critical)" : "var(--text-muted)" }}
+            style={{ color: draft.length > limit ? "var(--status-critical)" : "var(--text-muted)" }}
           >
-            {draft.length} / 280{draft.length > 280 ? " — over X's limit, publishing will fail" : ""}
+            {draft.length} / {limit}
+            {draft.length > limit ? ` — over ${approval.platform}'s limit, publishing will fail` : ""}
           </p>
         </div>
       ) : (
@@ -128,8 +160,44 @@ export function ApprovalCard({
           <p className="whitespace-pre-wrap text-sm text-[var(--text-primary)]">{displayContent}</p>
           {overLimit && (
             <p className="mt-1 text-xs font-medium text-[var(--status-critical)]">
-              {displayContent.length} / 280 — over X's limit. Edit before approving.
+              {displayContent.length} / {limit} — over {approval.platform}&apos;s limit. Edit before approving.
             </p>
+          )}
+        </div>
+      )}
+
+      {approval.platform === "LINKEDIN" && (
+        <div className="mb-3">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+            Image (optional — attach your own, never AI-generated)
+          </p>
+          {imageUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={imageUrl}
+              alt="Attached preview"
+              className="mb-2 max-h-48 rounded-md border border-[var(--border)] object-cover"
+            />
+          )}
+          {editing && (
+            <div className="flex items-center gap-2">
+              <input
+                type="file"
+                accept="image/*"
+                disabled={uploading}
+                onChange={handleImageSelect}
+                className="text-xs text-[var(--text-muted)] file:mr-2 file:rounded-md file:border file:border-[var(--border)] file:bg-[var(--surface-2)] file:px-2 file:py-1 file:text-xs file:text-[var(--text-secondary)]"
+              />
+              {uploading && <span className="text-xs text-[var(--text-muted)]">Uploading…</span>}
+              {imageUrl && !uploading && (
+                <button
+                  onClick={() => setImageUrl("")}
+                  className="text-xs text-[var(--status-critical)] hover:underline"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -167,9 +235,9 @@ export function ApprovalCard({
         {editing ? (
           <>
             <button
-              disabled={busy || overLimit}
+              disabled={busy || overLimit || uploading}
               onClick={() => act("edit")}
-              title={overLimit ? "Over 280 characters — trim it before saving" : undefined}
+              title={overLimit ? `Over ${limit} characters — trim it before saving` : undefined}
               className="rounded-md border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-50"
             >
               Save edit
@@ -178,6 +246,7 @@ export function ApprovalCard({
               disabled={busy}
               onClick={() => {
                 setDraft(displayContent);
+                setImageUrl(approval.imageUrl ?? "");
                 setEditing(false);
               }}
               className="rounded-md px-3 py-1.5 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]"
@@ -197,7 +266,7 @@ export function ApprovalCard({
             <button
               disabled={busy || overLimit}
               onClick={() => act("approve")}
-              title={overLimit ? "Over 280 characters — edit it before approving" : undefined}
+              title={overLimit ? `Over ${limit} characters — edit it before approving` : undefined}
               className="rounded-md bg-[var(--status-good)] px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
             >
               ✓ Approve

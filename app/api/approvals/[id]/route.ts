@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { isXConfigured, publishPostToX } from "@/lib/publishing/x-client";
-import { isBufferConfigured, schedulePostToBuffer } from "@/lib/publishing/buffer-client";
+import {
+  BufferPlatform,
+  isBufferConfiguredForPlatform,
+  schedulePostToBuffer,
+} from "@/lib/publishing/buffer-client";
 
 type Action = "approve" | "reject" | "edit";
+
+const BUFFER_PLATFORMS: BufferPlatform[] = ["X", "THREADS", "LINKEDIN"];
 
 interface LivePublishResult {
   publishedVia: "BUFFER" | "X";
@@ -18,6 +24,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const action = body?.action as Action | undefined;
   const editedContent = typeof body?.editedContent === "string" ? body.editedContent : undefined;
   const scheduledForInput = typeof body?.scheduledFor === "string" ? new Date(body.scheduledFor) : undefined;
+  const imageUrlInput = typeof body?.imageUrl === "string" ? body.imageUrl : undefined;
 
   if (!action || !["approve", "reject", "edit"].includes(action)) {
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
@@ -27,29 +34,44 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!approval) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   if (action === "edit") {
-    if (editedContent === undefined) {
-      return NextResponse.json({ error: "editedContent is required for edit" }, { status: 400 });
+    if (editedContent === undefined && imageUrlInput === undefined) {
+      return NextResponse.json(
+        { error: "editedContent or imageUrl is required for edit" },
+        { status: 400 },
+      );
     }
     const updated = await prisma.approval.update({
       where: { id },
-      data: { editedContent, status: "EDITED" },
+      data: {
+        ...(editedContent !== undefined ? { editedContent } : {}),
+        ...(imageUrlInput !== undefined ? { imageUrl: imageUrlInput } : {}),
+        status: "EDITED",
+      },
     });
     return NextResponse.json(updated);
   }
 
   const finalContent = editedContent ?? approval.editedContent ?? approval.content;
+  const finalImageUrl = imageUrlInput ?? approval.imageUrl ?? undefined;
 
   if (action === "approve") {
-    // Publishing priority: Buffer first (handles POST and REPLY alike, plus
-    // real scheduling), then direct X (POST only, always immediate — X's
-    // basic post endpoint has no scheduling of its own), then simulated.
-    // If the live call fails, nothing is marked approved so the item stays
-    // in the queue and can be retried.
+    // Publishing priority: Buffer first (handles any connected platform plus
+    // real scheduling and, for LinkedIn, an attached image), then direct X
+    // (POST only, X platform only, always immediate — X's basic post
+    // endpoint has no scheduling of its own), then simulated. If the live
+    // call fails, nothing is marked approved so the item stays in the queue
+    // and can be retried.
     let livePublish: LivePublishResult | null = null;
+    const bufferPlatform = BUFFER_PLATFORMS.find((p) => p === approval.platform);
 
-    if (isBufferConfigured()) {
+    if (bufferPlatform && isBufferConfiguredForPlatform(bufferPlatform)) {
       try {
-        const result = await schedulePostToBuffer(finalContent, scheduledForInput);
+        const result = await schedulePostToBuffer(
+          finalContent,
+          bufferPlatform,
+          scheduledForInput,
+          bufferPlatform === "LINKEDIN" ? finalImageUrl : undefined,
+        );
         livePublish = {
           publishedVia: "BUFFER",
           platformPostId: result.bufferPostId,
@@ -62,7 +84,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           { status: 502 },
         );
       }
-    } else if (approval.type === "POST" && approval.postId && isXConfigured()) {
+    } else if (approval.platform === "X" && approval.type === "POST" && approval.postId && isXConfigured()) {
       try {
         const result = await publishPostToX(finalContent);
         livePublish = {
@@ -84,6 +106,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       data: {
         status: "APPROVED",
         editedContent: editedContent ?? approval.editedContent,
+        imageUrl: finalImageUrl,
         resolvedAt: new Date(),
         publishedVia: livePublish?.publishedVia,
         platformPostId: livePublish?.platformPostId,

@@ -1,7 +1,9 @@
 import { prisma } from "@/lib/db/prisma";
 import { RunCycleButton } from "@/components/settings/RunCycleButton";
+import { KnowledgeBaseManager } from "@/components/settings/KnowledgeBaseManager";
 import { isXConfigured } from "@/lib/publishing/x-client";
-import { isBufferConfigured } from "@/lib/publishing/buffer-client";
+import { isBufferConfigured, isBufferConfiguredForPlatform } from "@/lib/publishing/buffer-client";
+import { PLATFORMS } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +26,7 @@ const TIER_GROUPS: { tier: string; label: string; color: string; actions: string
     tier: "APPROVAL",
     label: "🟡 Approval — the AI asks you",
     color: "var(--status-warning)",
-    actions: ["Publish X post", "Reply to someone", "Send community invitation", "Sensitive conversation"],
+    actions: ["Publish post (X/Threads/LinkedIn)", "Reply to someone", "Send community invitation", "Sensitive conversation"],
   },
   {
     tier: "NEVER",
@@ -40,12 +42,15 @@ const TIER_GROUPS: { tier: string; label: string; color: string; actions: string
   },
 ];
 
+const PLATFORM_LABEL: Record<string, string> = { X: "X (Twitter)", THREADS: "Threads", LINKEDIN: "LinkedIn" };
+
 export default async function SettingsPage() {
-  const [runs, hasApiKey, xConfigured, bufferConfigured] = await Promise.all([
+  const [runs, hasApiKey, xConfigured, bufferConfigured, knowledgeBaseEntries] = await Promise.all([
     prisma.agentRun.findMany({ orderBy: { startedAt: "desc" }, take: 10 }),
     Promise.resolve(Boolean(process.env.ANTHROPIC_API_KEY)),
     Promise.resolve(isXConfigured()),
     Promise.resolve(isBufferConfigured()),
+    prisma.knowledgeBaseEntry.findMany({ orderBy: { createdAt: "asc" } }),
   ]);
 
   return (
@@ -64,24 +69,39 @@ export default async function SettingsPage() {
               {hasApiKey ? "configured" : "missing — set ANTHROPIC_API_KEY in .env.local"}
             </span>
           </p>
-          <p>
-            Buffer:{" "}
-            <span
-              className="font-medium"
-              style={{ color: bufferConfigured ? "var(--status-good)" : "var(--text-muted)" }}
-            >
-              {bufferConfigured
-                ? "connected — approved posts/replies schedule via Buffer"
-                : "not connected"}
-            </span>
-            {!bufferConfigured && (
-              <span className="block text-[var(--text-muted)]">
-                Set BUFFER_API_KEY and BUFFER_CHANNEL_ID in .env.local. Buffer takes priority
-                over direct X posting when both are configured, and is the only path that
-                supports real scheduling and Threads.
+          <div>
+            <p className="mb-1">
+              Buffer:{" "}
+              <span
+                className="font-medium"
+                style={{ color: bufferConfigured ? "var(--status-good)" : "var(--text-muted)" }}
+              >
+                {bufferConfigured ? "connected" : "not connected"}
               </span>
+            </p>
+            <ul className="ml-4 list-disc space-y-0.5 text-[var(--text-secondary)]">
+              {PLATFORMS.map((p) => {
+                const connected = isBufferConfiguredForPlatform(p);
+                return (
+                  <li key={p}>
+                    {PLATFORM_LABEL[p]}:{" "}
+                    <span style={{ color: connected ? "var(--status-good)" : "var(--text-muted)" }}>
+                      {connected ? "channel connected" : "not connected"}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+            {!bufferConfigured && (
+              <p className="mt-1 text-[var(--text-muted)]">
+                Set BUFFER_API_KEY plus BUFFER_X_CHANNEL_ID / BUFFER_THREADS_CHANNEL_ID /
+                BUFFER_LINKEDIN_CHANNEL_ID in .env.local (run{" "}
+                <code className="text-[var(--text-secondary)]">npm run buffer:channels</code> to find
+                each id). Buffer takes priority over direct X posting per-platform, and is the only
+                path with real scheduling, Threads, and LinkedIn image attachment.
+              </p>
             )}
-          </p>
+          </div>
           <p>
             X (Twitter) direct:{" "}
             <span
@@ -89,8 +109,8 @@ export default async function SettingsPage() {
               style={{ color: xConfigured ? "var(--status-good)" : "var(--text-muted)" }}
             >
               {xConfigured
-                ? bufferConfigured
-                  ? "connected — unused while Buffer is connected"
+                ? isBufferConfiguredForPlatform("X")
+                  ? "connected — unused while Buffer's X channel is connected"
                   : "connected — approved posts publish live, immediately"
                 : "not connected — approved posts stay simulated"}
             </span>
@@ -99,17 +119,9 @@ export default async function SettingsPage() {
                 Set X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET in .env.local
                 (OAuth 1.0a user-context credentials from the X Developer Portal, app
                 permissions set to Read and Write). Only used for posts, and only when
-                Buffer isn&apos;t connected.
+                Buffer isn&apos;t connected for X specifically.
               </span>
             )}
-          </p>
-          <p>
-            Threads:{" "}
-            <span className="font-medium text-[var(--text-muted)]">
-              {bufferConfigured
-                ? "via Buffer, if a Threads channel is connected there"
-                : "not built directly — connect Buffer for this"}
-            </span>
           </p>
         </div>
       </section>
@@ -117,9 +129,10 @@ export default async function SettingsPage() {
       <section className="mt-6 rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-5">
         <h2 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Run agent cycle</h2>
         <p className="mb-4 text-xs text-[var(--text-muted)]">
-          There&apos;s no live X mentions feed yet, so nothing polls automatically. Trigger a cycle
-          manually and the Trend, Content, and Community agents will process whatever&apos;s new
-          against the seeded mock data.
+          Runs automatically every morning at 6am IST via a Vercel cron job (look for{" "}
+          <span className="font-medium text-[var(--text-secondary)]">CRON</span>-triggered runs
+          below). You can also trigger one manually any time — the Trend, Content, and Community
+          agents will process whatever&apos;s new, including fresh live-web-search trend research.
         </p>
         <RunCycleButton />
       </section>
@@ -170,6 +183,15 @@ export default async function SettingsPage() {
             </div>
           ))}
         </div>
+      </section>
+
+      <section className="mt-6 rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-5">
+        <h2 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Knowledge base</h2>
+        <p className="mb-4 text-xs text-[var(--text-muted)]">
+          Grounds trend research and drafting — brand voice, content pillars, safety rules, product
+          status. Edits here take effect on the next agent cycle, no redeploy needed.
+        </p>
+        <KnowledgeBaseManager entries={knowledgeBaseEntries} />
       </section>
     </div>
   );

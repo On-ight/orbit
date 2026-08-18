@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/prisma";
+import { discoverTrends } from "@/lib/agents/discover-trends";
 import { runTrendAgent } from "@/lib/agents/trend-agent";
 import { runContentAgent } from "@/lib/agents/content-agent";
 import { runCommunityAgent } from "@/lib/agents/community-agent";
@@ -26,6 +27,18 @@ export async function runAgentCycle(triggeredBy: "MANUAL" | "CRON" = "MANUAL"): 
 
   const parts: string[] = [];
   let hadError = false;
+
+  try {
+    const discovery = await discoverTrends();
+    parts.push(
+      discovery.ok
+        ? `Trend Discovery: ${discovery.created} new trend(s) found`
+        : `Trend Discovery failed: ${discovery.error}`,
+    );
+  } catch (err) {
+    hadError = true;
+    parts.push(`Trend Discovery crashed: ${String(err)}`);
+  }
 
   try {
     const trendResults = await runTrendAgent();

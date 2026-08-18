@@ -1,7 +1,33 @@
+import { Platform } from "@/lib/types";
+
 const BUFFER_API_URL = "https://api.buffer.com";
 
+export type BufferPlatform = Platform;
+
+const CHANNEL_ENV_VAR: Record<BufferPlatform, string> = {
+  X: "BUFFER_X_CHANNEL_ID",
+  THREADS: "BUFFER_THREADS_CHANNEL_ID",
+  LINKEDIN: "BUFFER_LINKEDIN_CHANNEL_ID",
+};
+
+/** True if Buffer is usable at all — at least one platform channel configured. */
 export function isBufferConfigured(): boolean {
-  return Boolean(process.env.BUFFER_API_KEY && process.env.BUFFER_CHANNEL_ID);
+  if (!process.env.BUFFER_API_KEY) return false;
+  return (Object.keys(CHANNEL_ENV_VAR) as BufferPlatform[]).some((p) => isBufferConfiguredForPlatform(p));
+}
+
+export function isBufferConfiguredForPlatform(platform: BufferPlatform): boolean {
+  return Boolean(process.env.BUFFER_API_KEY && process.env[CHANNEL_ENV_VAR[platform]]);
+}
+
+export function activeBufferPlatforms(): BufferPlatform[] {
+  return (Object.keys(CHANNEL_ENV_VAR) as BufferPlatform[]).filter((p) => isBufferConfiguredForPlatform(p));
+}
+
+function getChannelId(platform: BufferPlatform): string {
+  const channelId = process.env[CHANNEL_ENV_VAR[platform]];
+  if (!channelId) throw new Error(`${CHANNEL_ENV_VAR[platform]} is not set`);
+  return channelId;
 }
 
 interface GraphQLResponse<T> {
@@ -38,7 +64,7 @@ export interface BufferChannel {
   service: string;
 }
 
-/** Lists channels connected to the API key's organization — used once to find the channel ID for .env.local. */
+/** Lists channels connected to the API key's organization — used once to find each platform's channel ID for .env.local. */
 export async function listBufferChannels(): Promise<BufferChannel[]> {
   const orgData = await bufferGraphQL<{ account: { organizations: { id: string; name: string }[] } }>(
     `query { account { organizations { id name } } }`,
@@ -61,14 +87,22 @@ export interface ScheduledBufferPost {
 }
 
 /**
- * Schedules a post through Buffer. If dueAt is provided, it's scheduled for
- * that exact time (customScheduled); otherwise it's added to Buffer's queue
- * for the next available slot. Throws on failure — callers must not mark
+ * Schedules a post through Buffer on the given platform's connected channel.
+ * If dueAt is provided, it's scheduled for that exact time (customScheduled);
+ * otherwise it's added to Buffer's queue for the next available slot.
+ * imageUrl (LinkedIn only in practice) must be a publicly reachable,
+ * non-expiring URL — Buffer fetches it at actual publish time, which for a
+ * scheduled post can be hours or days later, so a signed/expiring URL will
+ * fail silently down the line. Throws on failure — callers must not mark
  * anything as published/scheduled unless this resolves successfully.
  */
-export async function schedulePostToBuffer(content: string, dueAt?: Date): Promise<ScheduledBufferPost> {
-  const channelId = process.env.BUFFER_CHANNEL_ID;
-  if (!channelId) throw new Error("BUFFER_CHANNEL_ID is not set");
+export async function schedulePostToBuffer(
+  content: string,
+  platform: BufferPlatform,
+  dueAt?: Date,
+  imageUrl?: string,
+): Promise<ScheduledBufferPost> {
+  const channelId = getChannelId(platform);
 
   const input: Record<string, unknown> = {
     text: content,
@@ -77,6 +111,7 @@ export async function schedulePostToBuffer(content: string, dueAt?: Date): Promi
     mode: dueAt ? "customScheduled" : "addToQueue",
   };
   if (dueAt) input.dueAt = dueAt.toISOString();
+  if (imageUrl) input.assets = [{ image: { url: imageUrl } }];
 
   const data = await bufferGraphQL<{
     createPost: { post?: { id: string }; message?: string };

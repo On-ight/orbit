@@ -108,6 +108,7 @@ model Approval {
   platformPostId String?
   publishedUrl   String?
   scheduledFor   DateTime?
+  imageUrl       String?  // LinkedIn only — user-attached while editing, never AI-generated
 
   resolvedAt     DateTime?
 
@@ -144,6 +145,7 @@ model TrendInput {
   id              String    @id @default(cuid())
   topic           String
   rawSignal       String    // seeded raw context (e.g. a tweet snippet or news blurb)
+  source          String    @default("SEED") // SEED | WEB_SEARCH
   summary         String?   // filled in by the Trend Agent
   riskTier        String?   // AUTO | NEVER — keyword-filter result on the trend itself
   matchedKeywords String?
@@ -151,4 +153,12 @@ model TrendInput {
   createdAt       DateTime  @default(now())
 
   posts           Post[]
+}
+
+model KnowledgeBaseEntry {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
