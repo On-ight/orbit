@@ -12,7 +12,7 @@ const analysisSchema = z.object({
   riskTier: z.enum(RISK_TIERS),
   riskReasoning: z.string(),
   recommendedAction: z.string(),
-  draftReply: z.string().nullable(),
+  draftReply: z.string().max(280, "X posts/replies cannot exceed 280 characters").nullable(),
   reasoning: z.string(),
 });
 
@@ -36,7 +36,8 @@ const inputSchema = {
     },
     draftReply: {
       type: ["string", "null"],
-      description: "A ready-to-send reply. Must be null if riskTier is NEVER.",
+      description:
+        "A ready-to-send reply, 280 characters or fewer (X's hard limit). Must be null if riskTier is NEVER.",
     },
     reasoning: { type: "string", description: "Why you scored intent/drafted this way" },
   },
@@ -81,7 +82,9 @@ Text: "${mention.text}"
 Likes: ${mention.likes}, Replies: ${mention.replyCount}
 
 Score the intent, identify the topic, decide if this looks like a potential OnSight customer,
-self-assess the risk tier, and draft a reply if appropriate.`,
+self-assess the risk tier, and draft a reply if appropriate. If you draft a reply, it must be
+280 characters or fewer, including spaces and punctuation — X's hard limit, not a suggestion.
+Count carefully; leave margin rather than write right up to the edge.`,
     });
   } catch (err) {
     // Fail-safe invariant: if classification errors for any reason (rate

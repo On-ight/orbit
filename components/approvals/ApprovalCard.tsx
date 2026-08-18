@@ -71,6 +71,7 @@ export function ApprovalCard({
 
   const displayContent = approval.editedContent ?? approval.content;
   const canPublishLive = bufferConfigured || (approval.type === "POST" && xConfigured);
+  const overLimit = editing ? draft.length > 280 : displayContent.length > 280;
 
   function publishNote(): string {
     if (bufferConfigured) {
@@ -108,16 +109,29 @@ export function ApprovalCard({
       )}
 
       {editing ? (
-        <textarea
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          rows={4}
-          className="mb-3 w-full rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
-        />
+        <div className="mb-3">
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            rows={4}
+            className="w-full rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+          />
+          <p
+            className="mt-1 text-right text-xs font-medium"
+            style={{ color: draft.length > 280 ? "var(--status-critical)" : "var(--text-muted)" }}
+          >
+            {draft.length} / 280{draft.length > 280 ? " — over X's limit, publishing will fail" : ""}
+          </p>
+        </div>
       ) : (
-        <p className="mb-3 whitespace-pre-wrap text-sm text-[var(--text-primary)]">
-          {displayContent}
-        </p>
+        <div className="mb-3">
+          <p className="whitespace-pre-wrap text-sm text-[var(--text-primary)]">{displayContent}</p>
+          {overLimit && (
+            <p className="mt-1 text-xs font-medium text-[var(--status-critical)]">
+              {displayContent.length} / 280 — over X's limit. Edit before approving.
+            </p>
+          )}
+        </div>
       )}
 
       <p className="mb-2 text-xs text-[var(--text-muted)]">
@@ -153,8 +167,9 @@ export function ApprovalCard({
         {editing ? (
           <>
             <button
-              disabled={busy}
+              disabled={busy || overLimit}
               onClick={() => act("edit")}
+              title={overLimit ? "Over 280 characters — trim it before saving" : undefined}
               className="rounded-md border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-50"
             >
               Save edit
@@ -180,8 +195,9 @@ export function ApprovalCard({
               Edit
             </button>
             <button
-              disabled={busy}
+              disabled={busy || overLimit}
               onClick={() => act("approve")}
+              title={overLimit ? "Over 280 characters — edit it before approving" : undefined}
               className="rounded-md bg-[var(--status-good)] px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
             >
               ✓ Approve

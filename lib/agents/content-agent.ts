@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { callStructuredClaude } from "@/lib/agents/claude-client";
 
 const draftSchema = z.object({
-  content: z.string(),
+  content: z.string().max(280, "X posts cannot exceed 280 characters"),
   confidence: z.number().min(0).max(1),
   reasoning: z.string(),
 });
@@ -11,7 +11,10 @@ const draftSchema = z.object({
 const inputSchema = {
   type: "object",
   properties: {
-    content: { type: "string", description: "The full text of the post, ready to publish" },
+    content: {
+      type: "string",
+      description: "The full text of the post, ready to publish. Must be 280 characters or fewer — X's hard limit.",
+    },
     confidence: { type: "number", description: "0 to 1 confidence this post is on-brand and worth publishing" },
     reasoning: { type: "string", description: "Why this angle, in one or two sentences" },
   },
@@ -50,7 +53,9 @@ export async function runContentAgentOnTrend(trendId: string): Promise<ContentAg
 Topic: ${trend.topic}
 Trend summary: ${trend.summary}
 
-Keep it to 1-3 sentences, on-brand, no hashtag spam.`,
+Keep it to 1-3 sentences, on-brand, no hashtag spam. Hard limit: 280 characters
+total, including spaces and punctuation — this is X's post length limit, not a
+suggestion. Count carefully; leave margin rather than write right up to the edge.`,
     });
 
     const post = await prisma.post.create({
