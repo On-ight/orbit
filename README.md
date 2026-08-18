@@ -3,9 +3,8 @@
 A v1 AI marketing command center for X: the Trend, Content, and Community agents
 prepare drafts against seeded mock mentions, everything lands in an approval
 queue, and a three-tier risk policy decides what the AI can do on its own
-versus what needs your sign-off. Approved original posts can publish live to X
-once you've connected credentials (see below); replies and Threads/Instagram
-are still simulated/not built.
+versus what needs your sign-off. Approved posts and replies can publish for
+real once you've connected Buffer and/or X (see below); Instagram isn't built.
 
 ## Setup
 
@@ -37,19 +36,34 @@ Open [http://localhost:3000](http://localhost:3000). You'll be redirected to
 | `ANTHROPIC_API_KEY` | Powers the three agents. Without it, agent runs still complete but every item fails safe to the flagged/`NEVER` risk tier (see Settings page). |
 | `DASHBOARD_PASSWORD` | Shared password gating the whole app — change this before sharing the URL with anyone |
 | `SESSION_SECRET` | Signs the session cookie — use a long random string before deploying anywhere real |
-| `X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_SECRET` | OAuth 1.0a user-context credentials for posting to X. Without these, approved posts stay simulated. See below for how to get them. |
+| `X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_SECRET` | OAuth 1.0a user-context credentials for posting to X directly. Optional if Buffer is connected. See below. |
+| `BUFFER_API_KEY`, `BUFFER_CHANNEL_ID` | Publishes/schedules through Buffer instead of X directly — also covers Threads if you connect a Threads channel in Buffer. Takes priority over direct X when both are set. See below. |
 
-## Connecting X (Twitter) for live posting
+## Connecting Buffer (recommended — covers X, Threads, and real scheduling)
+
+Buffer's API is free on every plan (including free), and it's the only path here with
+actual scheduling — approving something can queue it for later instead of posting
+immediately.
+
+1. In Buffer, connect the channel(s) you want to publish to (X, Threads, etc.) — this happens in Buffer's own dashboard, not this app.
+2. Create a personal API key: profile icon → **API** (or [publish.buffer.com/settings/api](https://publish.buffer.com/settings/api)) → **Personal Access** tab → **+ New Key**. Give it all permissions and a 1-year expiry (keys aren't permanent like X's OAuth token — you'll need to regenerate this annually).
+3. Put it in `.env.local` as `BUFFER_API_KEY`.
+4. Run `npm run buffer:channels` — this lists your connected channels and their IDs. Copy the one you want into `BUFFER_CHANNEL_ID`.
+5. Restart `npm run dev`. Settings will show "Buffer: connected."
+
+**Limitation to know about:** Buffer schedules standalone posts to a channel's queue — it does not post in-thread replies to a specific tweet. So `REPLY`-type approvals published via Buffer go out as regular posts with the drafted text, not as an actual @-reply under the original post.
+
+## Connecting X (Twitter) directly (optional, only used when Buffer isn't connected)
 
 1. Apply for a developer account at [developer.x.com](https://developer.x.com) and create a Project + App.
 2. In the app's **User authentication settings**, enable OAuth 1.0a and set App permissions to **Read and Write** (posting fails with a 403 under Read-only).
 3. Generate/regenerate: **API Key & Secret** and **Access Token & Secret** (must be regenerated *after* switching to Read and Write, or they'll carry the old read-only scope).
 4. Drop all four into `.env.local` as `X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_SECRET`.
-5. Restart `npm run dev`. Settings will show "X (Twitter): connected."
+5. Restart `npm run dev`.
 
-X moved to pay-per-use pricing in Feb 2026 — posting costs ~$0.015/post (~$0.20 if it contains a link), billed to whatever payment method is on the developer account. There's no free tier anymore, but also no monthly minimum.
+X moved to **prepaid-credits-only** pay-per-use pricing in Feb 2026 — posting costs ~$0.015/post (~$0.20 if it contains a link), reading costs ~$0.005/post and ~$0.01/user. There's no postpaid "card on file" option and no free tier — buy a credit balance in the X Developer Portal before this will work, and set a per-cycle spending cap while you're there. Unlike Buffer, direct X posting is always immediate — there's no scheduling on this path.
 
-**What's live vs. simulated right now:** approving a `POST`-type item in the queue publishes it for real once X is connected. `REPLY`-type approvals stay simulated regardless — the seeded mentions they respond to are mock data with no real tweet behind them, so there's nothing genuine to reply to yet. Making replies go live is a separate follow-up: it means replacing the mock mentions feed with a real one from the X API (which also means read costs), so a real tweet ID exists to attach the reply to. Threads publishing isn't built yet.
+**What's live vs. simulated right now:** approving a `POST` or `REPLY` publishes for real once Buffer *or* X is connected (Buffer wins if both are). Nothing auto-posts — every item sits in the queue until you explicitly approve it. Real @-replies to real mentions aren't possible yet regardless of provider: the seeded mentions Community Agent drafts against are mock data with no real tweet behind them. Making that real means building live mention-polling from the X API (a separate, costlier feature — see "How it works" below).
 
 ## Deploying (Vercel + Neon Postgres)
 
@@ -68,7 +82,8 @@ per-user accounts yet.
 4. **Add the rest of the environment variables** in Project Settings →
    Environment Variables: `ANTHROPIC_API_KEY`, `DASHBOARD_PASSWORD` (pick a
    real one — not `changeme`), `SESSION_SECRET` (a long random string — e.g.
-   `openssl rand -hex 32`), and the four `X_*` variables if you've connected X.
+   `openssl rand -hex 32`), `BUFFER_API_KEY`/`BUFFER_CHANNEL_ID` if you've
+   connected Buffer, and the four `X_*` variables if you've connected X directly.
 5. **Generate the first Postgres migration.** This has to happen once, from
    your machine, against the real database — I can't do it without your DB
    credentials, and Vercel's build step only *applies* migrations, it

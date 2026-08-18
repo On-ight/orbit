@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db/prisma";
 import { ApprovalCard } from "@/components/approvals/ApprovalCard";
 import { isXConfigured } from "@/lib/publishing/x-client";
+import { isBufferConfigured } from "@/lib/publishing/buffer-client";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,7 @@ export default async function ApprovalsPage() {
     orderBy: { createdAt: "desc" },
   });
   const xConfigured = isXConfigured();
+  const bufferConfigured = isBufferConfigured();
 
   return (
     <div>
@@ -29,6 +31,7 @@ export default async function ApprovalsPage() {
           <ApprovalCard
             key={approval.id}
             xConfigured={xConfigured}
+            bufferConfigured={bufferConfigured}
             approval={{
               ...approval,
               createdAt: approval.createdAt.toISOString(),

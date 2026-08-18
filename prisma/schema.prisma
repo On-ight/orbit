@@ -67,6 +67,7 @@ model Post {
   platform      String    @default("X")
   status        String    @default("DRAFT") // DRAFT | SCHEDULED | PUBLISHED
   simulated     Boolean   @default(true)
+  publishedVia  String?   // BUFFER | X | null
   scheduledFor  DateTime?
   publishedAt   DateTime?
   platformPostId String?
@@ -99,6 +100,14 @@ model Approval {
   conversation   Conversation? @relation(fields: [conversationId], references: [id])
   postId         String?
   post           Post?    @relation(fields: [postId], references: [id])
+
+  // Set when this approval was published directly (not via a linked Post) —
+  // currently REPLY approvals published through Buffer, which schedules a
+  // standalone update rather than an in-thread reply.
+  publishedVia   String?  // BUFFER | X | null
+  platformPostId String?
+  publishedUrl   String?
+  scheduledFor   DateTime?
 
   resolvedAt     DateTime?
 

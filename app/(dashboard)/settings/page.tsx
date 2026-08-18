@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db/prisma";
 import { RunCycleButton } from "@/components/settings/RunCycleButton";
 import { isXConfigured } from "@/lib/publishing/x-client";
+import { isBufferConfigured } from "@/lib/publishing/buffer-client";
 
 export const dynamic = "force-dynamic";
 
@@ -40,10 +41,11 @@ const TIER_GROUPS: { tier: string; label: string; color: string; actions: string
 ];
 
 export default async function SettingsPage() {
-  const [runs, hasApiKey, xConfigured] = await Promise.all([
+  const [runs, hasApiKey, xConfigured, bufferConfigured] = await Promise.all([
     prisma.agentRun.findMany({ orderBy: { startedAt: "desc" }, take: 10 }),
     Promise.resolve(Boolean(process.env.ANTHROPIC_API_KEY)),
     Promise.resolve(isXConfigured()),
+    Promise.resolve(isBufferConfigured()),
   ]);
 
   return (
@@ -63,25 +65,51 @@ export default async function SettingsPage() {
             </span>
           </p>
           <p>
-            X (Twitter):{" "}
+            Buffer:{" "}
+            <span
+              className="font-medium"
+              style={{ color: bufferConfigured ? "var(--status-good)" : "var(--text-muted)" }}
+            >
+              {bufferConfigured
+                ? "connected — approved posts/replies schedule via Buffer"
+                : "not connected"}
+            </span>
+            {!bufferConfigured && (
+              <span className="block text-[var(--text-muted)]">
+                Set BUFFER_API_KEY and BUFFER_CHANNEL_ID in .env.local. Buffer takes priority
+                over direct X posting when both are configured, and is the only path that
+                supports real scheduling and Threads.
+              </span>
+            )}
+          </p>
+          <p>
+            X (Twitter) direct:{" "}
             <span
               className="font-medium"
               style={{ color: xConfigured ? "var(--status-good)" : "var(--text-muted)" }}
             >
               {xConfigured
-                ? "connected — approved posts publish live"
+                ? bufferConfigured
+                  ? "connected — unused while Buffer is connected"
+                  : "connected — approved posts publish live, immediately"
                 : "not connected — approved posts stay simulated"}
             </span>
             {!xConfigured && (
               <span className="block text-[var(--text-muted)]">
                 Set X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET in .env.local
                 (OAuth 1.0a user-context credentials from the X Developer Portal, app
-                permissions set to Read and Write).
+                permissions set to Read and Write). Only used for posts, and only when
+                Buffer isn&apos;t connected.
               </span>
             )}
           </p>
           <p>
-            Threads: <span className="font-medium text-[var(--text-muted)]">not built yet</span>
+            Threads:{" "}
+            <span className="font-medium text-[var(--text-muted)]">
+              {bufferConfigured
+                ? "via Buffer, if a Threads channel is connected there"
+                : "not built directly — connect Buffer for this"}
+            </span>
           </p>
         </div>
       </section>

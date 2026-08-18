@@ -27,13 +27,16 @@ const TYPE_LABEL: Record<string, string> = {
 export function ApprovalCard({
   approval,
   xConfigured,
+  bufferConfigured,
 }: {
   approval: ApprovalCardData;
   xConfigured: boolean;
+  bufferConfigured: boolean;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(approval.editedContent ?? approval.content);
+  const [scheduledFor, setScheduledFor] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,6 +50,10 @@ export function ApprovalCard({
         body: JSON.stringify({
           action,
           editedContent: action !== "reject" && draft !== approval.content ? draft : undefined,
+          scheduledFor:
+            action === "approve" && bufferConfigured && scheduledFor
+              ? new Date(scheduledFor).toISOString()
+              : undefined,
         }),
       });
       if (!res.ok) {
@@ -63,6 +70,19 @@ export function ApprovalCard({
   }
 
   const displayContent = approval.editedContent ?? approval.content;
+  const canPublishLive = bufferConfigured || (approval.type === "POST" && xConfigured);
+
+  function publishNote(): string {
+    if (bufferConfigured) {
+      return scheduledFor
+        ? `Approving this will schedule it via Buffer for ${new Date(scheduledFor).toLocaleString()}.`
+        : "Approving this will queue it via Buffer for the next available slot.";
+    }
+    if (approval.type === "POST" && xConfigured) {
+      return "Approving this will publish it live to X immediately.";
+    }
+    return "No publishing connection configured — approving this will only mark it published in the demo pipeline.";
+  }
 
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-5">
@@ -104,15 +124,23 @@ export function ApprovalCard({
         AI reasoning: {approval.aiReasoning} · Confidence: {Math.round(approval.confidence * 100)}%
       </p>
 
-      {approval.type === "POST" && (
-        <p
-          className="mb-4 text-xs font-medium"
-          style={{ color: xConfigured ? "var(--status-good)" : "var(--text-muted)" }}
-        >
-          {xConfigured
-            ? "Approving this will publish it live to X."
-            : "X isn't connected — approving this will only mark it published in the demo pipeline."}
-        </p>
+      <p
+        className="mb-2 text-xs font-medium"
+        style={{ color: canPublishLive ? "var(--status-good)" : "var(--text-muted)" }}
+      >
+        {publishNote()}
+      </p>
+
+      {bufferConfigured && !editing && (
+        <label className="mb-4 block text-xs text-[var(--text-muted)]">
+          Schedule for (optional — leave blank to queue immediately)
+          <input
+            type="datetime-local"
+            value={scheduledFor}
+            onChange={(e) => setScheduledFor(e.target.value)}
+            className="mt-1 block rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2 py-1 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+          />
+        </label>
       )}
 
       {error && (
