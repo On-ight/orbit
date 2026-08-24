@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db/prisma";
 import { runAgentCycle } from "@/lib/agents/run-cycle";
 
 // Web search + multi-platform drafting makes a cycle meaningfully longer
@@ -16,10 +17,23 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  try {
-    const result = await runAgentCycle("CRON");
-    return NextResponse.json(result);
-  } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+  const activeAccounts = await prisma.account.findMany({
+    where: { subscriptionStatus: "active" },
+    select: { id: true, name: true },
+  });
+
+  const results: { accountId: string; status: string; error?: string }[] = [];
+
+  for (const account of activeAccounts) {
+    // Isolated per account — one tenant's Claude/Buffer failure must not
+    // block the daily cycle for anyone else.
+    try {
+      const result = await runAgentCycle(account.id, "CRON");
+      results.push({ accountId: account.id, status: result.status });
+    } catch (err) {
+      results.push({ accountId: account.id, status: "FAILED", error: String(err) });
+    }
   }
+
+  return NextResponse.json({ accountsProcessed: activeAccounts.length, results });
 }

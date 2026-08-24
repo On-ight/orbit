@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
-import { callStructuredClaude } from "@/lib/agents/claude-client";
+import { callStructuredClaude, buildSystemPrompt } from "@/lib/agents/claude-client";
 import { runKeywordPreFilter } from "@/lib/agents/risk-tiers";
 
 const summarySchema = z.object({
@@ -12,7 +12,7 @@ const inputSchema = {
   properties: {
     summary: {
       type: "string",
-      description: "A 1-2 sentence summary of why this trend matters for OnSight's audience",
+      description: "A 1-2 sentence summary of why this trend matters for this business's audience",
     },
   },
   required: ["summary"],
@@ -29,7 +29,7 @@ export interface TrendAgentItemResult {
  * topic must not silently flow into the Content Agent's prompt input, so the
  * same keyword pre-filter used for conversations gates what gets summarized.
  */
-export async function runTrendAgentOnInput(trendId: string): Promise<TrendAgentItemResult> {
+export async function runTrendAgentOnInput(accountId: string, trendId: string): Promise<TrendAgentItemResult> {
   const trend = await prisma.trendInput.findUnique({ where: { id: trendId } });
   if (!trend) return { trendId, ok: false, error: "Trend input not found" };
   if (trend.processedAt) return { trendId, ok: true };
@@ -50,12 +50,14 @@ export async function runTrendAgentOnInput(trendId: string): Promise<TrendAgentI
   }
 
   try {
+    const system = await buildSystemPrompt(accountId);
     const result = await callStructuredClaude({
       toolName: "record_trend_summary",
       toolDescription: "Records a short summary of a trending topic for use in later post drafting.",
       inputSchema,
       zodSchema: summarySchema,
-      userMessage: `Summarize this trend for OnSight's content planning.
+      system,
+      userMessage: `Summarize this trend for this business's content planning.
 
 Topic: ${trend.topic}
 Signal: "${trend.rawSignal}"`,
@@ -76,15 +78,15 @@ Signal: "${trend.rawSignal}"`,
   }
 }
 
-export async function runTrendAgent(): Promise<TrendAgentItemResult[]> {
+export async function runTrendAgent(accountId: string): Promise<TrendAgentItemResult[]> {
   const unprocessed = await prisma.trendInput.findMany({
-    where: { processedAt: null },
+    where: { accountId, processedAt: null },
     select: { id: true },
   });
 
   const results: TrendAgentItemResult[] = [];
   for (const trend of unprocessed) {
-    results.push(await runTrendAgentOnInput(trend.id));
+    results.push(await runTrendAgentOnInput(accountId, trend.id));
   }
   return results;
 }

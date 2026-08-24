@@ -1,7 +1,7 @@
-// Growth Command Center — v1 data model.
-// Enums are modeled as String (not Prisma `enum`) — a holdover from when this
-// ran on SQLite, kept for schema stability. The canonical value sets live in
-// lib/types.ts.
+// Orbit — multi-tenant data model. Every business-data model belongs to an
+// Account (the tenant/workspace/billing entity). Enums are modeled as String
+// (not Prisma `enum`) — a holdover from when this ran on SQLite, kept for
+// schema stability. The canonical value sets live in lib/types.ts.
 
 generator client {
   provider = "prisma-client-js"
@@ -13,8 +13,69 @@ datasource db {
   directUrl = env("DATABASE_URL_UNPOOLED") // direct connection, used for migrations
 }
 
+model Account {
+  id                   String    @id @default(cuid())
+  name                 String
+  planTier             String?   // STARTER | GROWTH | AGENCY | null
+  subscriptionStatus   String    @default("incomplete") // incomplete | active | past_due | canceled
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  users                User[]
+  bufferChannels       AccountBufferChannel[]
+  mockMentions         MockMention[]
+  conversations        Conversation[]
+  posts                Post[]
+  approvals            Approval[]
+  agentRuns            AgentRun[]
+  dailySnapshots       DailySnapshot[]
+  trendInputs          TrendInput[]
+  knowledgeBaseEntries KnowledgeBaseEntry[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  // Bumped on password change/suspension so existing signed cookies stop
+  // being trusted without needing a global SESSION_SECRET rotation.
+  tokenVersion Int      @default(0)
+  isAdmin      Boolean  @default(false)
+
+  accountId    String
+  account      Account  @relation(fields: [accountId], references: [id])
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([accountId])
+}
+
+model AccountBufferChannel {
+  id              String   @id @default(cuid())
+  accountId       String
+  account         Account  @relation(fields: [accountId], references: [id])
+  platform        String   // X | THREADS | LINKEDIN
+  bufferChannelId String
+
+  createdAt       DateTime @default(now())
+
+  @@unique([accountId, platform])
+}
+
+model StripeEvent {
+  id          String   @id // Stripe's own event id — idempotency guard for webhook redelivery
+  processedAt DateTime @default(now())
+}
+
 model MockMention {
   id           String   @id @default(cuid())
+  accountId    String
+  account      Account  @relation(fields: [accountId], references: [id])
+
   authorHandle String
   authorName   String
   text         String
@@ -25,10 +86,15 @@ model MockMention {
   updatedAt    DateTime @updatedAt
 
   conversation Conversation?
+
+  @@index([accountId])
 }
 
 model Conversation {
   id               String   @id @default(cuid())
+  accountId        String
+  account          Account  @relation(fields: [accountId], references: [id])
+
   sourceMentionId  String   @unique
   sourceMention    MockMention @relation(fields: [sourceMentionId], references: [id])
 
@@ -56,6 +122,7 @@ model Conversation {
 
   approvals        Approval[]
 
+  @@index([accountId])
   @@index([status])
   @@index([intent])
   @@index([riskTier])
@@ -63,6 +130,9 @@ model Conversation {
 
 model Post {
   id            String    @id @default(cuid())
+  accountId     String
+  account       Account   @relation(fields: [accountId], references: [id])
+
   content       String
   platform      String    @default("X")
   status        String    @default("DRAFT") // DRAFT | SCHEDULED | PUBLISHED
@@ -81,11 +151,14 @@ model Post {
 
   approvals     Approval[]
 
-  @@index([status])
+  @@index([accountId, status])
 }
 
 model Approval {
   id             String   @id @default(cuid())
+  accountId      String
+  account        Account  @relation(fields: [accountId], references: [id])
+
   type           String   // POST | REPLY | COMMUNITY_INVITE
   status         String   @default("PENDING") // PENDING | APPROVED | REJECTED | EDITED
   platform       String   @default("X")
@@ -115,11 +188,14 @@ model Approval {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  @@index([status])
+  @@index([accountId, status])
 }
 
 model AgentRun {
   id           String    @id @default(cuid())
+  accountId    String
+  account      Account   @relation(fields: [accountId], references: [id])
+
   triggeredBy  String    @default("MANUAL") // MANUAL | CRON
   status       String    @default("RUNNING") // RUNNING | COMPLETED | FAILED
   summary      String?
@@ -129,20 +205,30 @@ model AgentRun {
 
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+
+  @@index([accountId])
 }
 
 model DailySnapshot {
   id             String   @id @default(cuid())
-  date           DateTime @unique
+  accountId      String
+  account        Account  @relation(fields: [accountId], references: [id])
+
+  date           DateTime
   newFollowers   Int
   waitlistSignups Int
   isDemoData     Boolean  @default(true)
 
   createdAt      DateTime @default(now())
+
+  @@unique([accountId, date])
 }
 
 model TrendInput {
   id              String    @id @default(cuid())
+  accountId       String
+  account         Account   @relation(fields: [accountId], references: [id])
+
   topic           String
   rawSignal       String    // seeded raw context (e.g. a tweet snippet or news blurb)
   source          String    @default("SEED") // SEED | WEB_SEARCH
@@ -153,12 +239,24 @@ model TrendInput {
   createdAt       DateTime  @default(now())
 
   posts           Post[]
+
+  @@index([accountId])
 }
 
 model KnowledgeBaseEntry {
   id        String   @id @default(cuid())
+  accountId String
+  account   Account  @relation(fields: [accountId], references: [id])
+
+  // Stable lookup key for entries agents pull in by role (e.g. CONTENT_PILLARS,
+  // SAFETY_RULES, BRAND_VOICE, PRODUCT_FEATURES, FOUNDER_STORY). Null for
+  // freeform extra entries a tenant adds beyond the standard slots — those
+  // just get title-displayed in the UI, not targeted by code.
+  key       String?
   title     String
   content   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([accountId])
 }

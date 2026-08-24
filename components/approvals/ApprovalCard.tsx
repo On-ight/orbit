@@ -32,11 +32,9 @@ function charLimitFor(platform: string): number {
 
 export function ApprovalCard({
   approval,
-  xConfigured,
   bufferPlatforms,
 }: {
   approval: ApprovalCardData;
-  xConfigured: boolean;
   bufferPlatforms: string[];
 }) {
   const router = useRouter();
@@ -101,7 +99,7 @@ export function ApprovalCard({
   }
 
   const displayContent = approval.editedContent ?? approval.content;
-  const canPublishLive = bufferConfigured || (approval.type === "POST" && approval.platform === "X" && xConfigured);
+  const canPublishLive = bufferConfigured;
   const overLimit = editing ? draft.length > limit : displayContent.length > limit;
 
   function publishNote(): string {
@@ -109,9 +107,6 @@ export function ApprovalCard({
       return scheduledFor
         ? `Approving this will schedule it via Buffer for ${new Date(scheduledFor).toLocaleString()}.`
         : "Approving this will queue it via Buffer for the next available slot.";
-    }
-    if (approval.type === "POST" && approval.platform === "X" && xConfigured) {
-      return "Approving this will publish it live to X immediately.";
     }
     return "No publishing connection configured for this platform — approving this will only mark it published in the demo pipeline.";
   }

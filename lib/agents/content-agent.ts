@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
-import { callStructuredClaude } from "@/lib/agents/claude-client";
+import { callStructuredClaude, buildSystemPrompt } from "@/lib/agents/claude-client";
 import { activeBufferPlatforms, isBufferConfigured, BufferPlatform } from "@/lib/publishing/buffer-client";
 import { PLATFORM_CHAR_LIMITS as PLATFORM_LIMITS } from "@/lib/types";
 
@@ -31,6 +31,7 @@ function platformKey(p: BufferPlatform): string {
  * object are worth validating defensively rather than trusting blindly.
  */
 async function draftVariantsForTrend(
+  accountId: string,
   trend: { topic: string; summary: string },
   platforms: BufferPlatform[],
 ): Promise<{ results: { platform: BufferPlatform; draft: Variant }[]; errors: string[] }> {
@@ -62,6 +63,8 @@ async function draftVariantsForTrend(
     .map((p) => `- ${p}: ${PLATFORM_LIMITS[p]} character hard limit — aim for well under this, not right up to it`)
     .join("\n");
 
+  const system = await buildSystemPrompt(accountId);
+
   // Loose passthrough schema here on purpose — each platform's sub-object is
   // validated independently below instead of atomically via callStructuredClaude.
   const raw = await callStructuredClaude({
@@ -69,11 +72,11 @@ async function draftVariantsForTrend(
     toolDescription: "Records one drafted social post variant per requested platform, adapted to each platform's length and tone.",
     inputSchema: { type: "object", properties, required },
     zodSchema: z.record(z.string(), z.unknown()),
-    userMessage: `Draft a post reacting to this trend for OnSight, adapted for each platform below.
-The core idea should be the same across platforms, but fit each one's length and register —
-X and Threads are short and punchy, LinkedIn can be a bit more developed (though still on-brand,
-not corporate) and should front-load the hook since only the first ~140-200 characters show
-before "see more."
+    system,
+    userMessage: `Draft a post reacting to this trend, adapted for each platform below. The core
+idea should be the same across platforms, but fit each one's length and register — X and Threads
+are short and punchy, LinkedIn can be a bit more developed (though still on-brand, not corporate)
+and should front-load the hook since only the first ~140-200 characters show before "see more."
 
 Topic: ${trend.topic}
 Trend summary: ${trend.summary}
@@ -134,7 +137,7 @@ platform's draft gets rejected outright and doesn't get published at all.`,
  * configured for any platform, this falls back to exactly the original
  * behavior: X-only, via the direct X posting path in the approvals route.
  */
-export async function runContentAgentOnTrend(trendId: string): Promise<ContentAgentItemResult> {
+export async function runContentAgentOnTrend(accountId: string, trendId: string): Promise<ContentAgentItemResult> {
   const trend = await prisma.trendInput.findUnique({
     where: { id: trendId },
     include: { posts: { select: { platform: true } } },
@@ -144,8 +147,9 @@ export async function runContentAgentOnTrend(trendId: string): Promise<ContentAg
 
   const existingPlatforms = new Set(trend.posts.map((p) => p.platform));
 
-  const targetPlatforms: BufferPlatform[] = isBufferConfigured()
-    ? activeBufferPlatforms().filter((p) => !existingPlatforms.has(p))
+  const bufferConfigured = await isBufferConfigured(accountId);
+  const targetPlatforms: BufferPlatform[] = bufferConfigured
+    ? (await activeBufferPlatforms(accountId)).filter((p) => !existingPlatforms.has(p))
     : existingPlatforms.has("X")
       ? []
       : ["X"];
@@ -154,6 +158,7 @@ export async function runContentAgentOnTrend(trendId: string): Promise<ContentAg
 
   try {
     const { results, errors } = await draftVariantsForTrend(
+      accountId,
       { topic: trend.topic, summary: trend.summary },
       targetPlatforms,
     );
@@ -161,6 +166,7 @@ export async function runContentAgentOnTrend(trendId: string): Promise<ContentAg
     for (const { platform, draft } of results) {
       const post = await prisma.post.create({
         data: {
+          accountId,
           content: draft.content,
           platform,
           status: "DRAFT",
@@ -170,6 +176,7 @@ export async function runContentAgentOnTrend(trendId: string): Promise<ContentAg
 
       await prisma.approval.create({
         data: {
+          accountId,
           type: "POST",
           platform,
           content: draft.content,
@@ -190,15 +197,15 @@ export async function runContentAgentOnTrend(trendId: string): Promise<ContentAg
   }
 }
 
-export async function runContentAgent(): Promise<ContentAgentItemResult[]> {
+export async function runContentAgent(accountId: string): Promise<ContentAgentItemResult[]> {
   const readyTrends = await prisma.trendInput.findMany({
-    where: { riskTier: "AUTO", summary: { not: null } },
+    where: { accountId, riskTier: "AUTO", summary: { not: null } },
     select: { id: true },
   });
 
   const results: ContentAgentItemResult[] = [];
   for (const trend of readyTrends) {
-    results.push(await runContentAgentOnTrend(trend.id));
+    results.push(await runContentAgentOnTrend(accountId, trend.id));
   }
   return results;
 }

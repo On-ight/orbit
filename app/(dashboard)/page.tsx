@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db/prisma";
 import { StatTile } from "@/components/dashboard/StatTile";
+import { requireCurrentUser } from "@/lib/auth/current-user";
 
 export const dynamic = "force-dynamic";
 
@@ -12,15 +13,18 @@ function greeting(): string {
 }
 
 export default async function OverviewPage() {
+  const currentUser = await requireCurrentUser();
+  const { accountId } = currentUser;
+
   const [pendingApprovals, pendingReplies, pendingPosts, highIntentCount, flaggedCount, mentionsProcessed, latestSnapshot] =
     await Promise.all([
-      prisma.approval.count({ where: { status: "PENDING" } }),
-      prisma.approval.count({ where: { status: "PENDING", type: "REPLY" } }),
-      prisma.approval.count({ where: { status: "PENDING", type: "POST" } }),
-      prisma.conversation.count({ where: { intent: "HIGH", status: { in: ["NEW", "DRAFTED"] } } }),
-      prisma.conversation.count({ where: { riskTier: "NEVER", status: "NEW" } }),
-      prisma.conversation.count(),
-      prisma.dailySnapshot.findFirst({ orderBy: { date: "desc" } }),
+      prisma.approval.count({ where: { accountId, status: "PENDING" } }),
+      prisma.approval.count({ where: { accountId, status: "PENDING", type: "REPLY" } }),
+      prisma.approval.count({ where: { accountId, status: "PENDING", type: "POST" } }),
+      prisma.conversation.count({ where: { accountId, intent: "HIGH", status: { in: ["NEW", "DRAFTED"] } } }),
+      prisma.conversation.count({ where: { accountId, riskTier: "NEVER", status: "NEW" } }),
+      prisma.conversation.count({ where: { accountId } }),
+      prisma.dailySnapshot.findFirst({ where: { accountId }, orderBy: { date: "desc" } }),
     ]);
 
   const attentionItems = [
@@ -40,8 +44,12 @@ export default async function OverviewPage() {
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
         <StatTile label="Pending approvals" value={pendingApprovals} />
         <StatTile label="Mentions processed" value={mentionsProcessed} />
-        <StatTile label="New followers" value={latestSnapshot?.newFollowers ?? 0} isDemoData />
-        <StatTile label="Waitlist signups" value={latestSnapshot?.waitlistSignups ?? 0} isDemoData />
+        {latestSnapshot && (
+          <>
+            <StatTile label="New followers" value={latestSnapshot.newFollowers} isDemoData />
+            <StatTile label="Waitlist signups" value={latestSnapshot.waitlistSignups} isDemoData />
+          </>
+        )}
       </div>
 
       <div className="mt-8 rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-5">

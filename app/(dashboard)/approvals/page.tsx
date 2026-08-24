@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db/prisma";
 import { ApprovalCard } from "@/components/approvals/ApprovalCard";
-import { isXConfigured } from "@/lib/publishing/x-client";
 import { activeBufferPlatforms } from "@/lib/publishing/buffer-client";
+import { requireCurrentUser } from "@/lib/auth/current-user";
 import { PLATFORMS, Platform } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -22,11 +22,13 @@ export default async function ApprovalsPage({
 }: {
   searchParams: Promise<{ platform?: string }>;
 }) {
+  const currentUser = await requireCurrentUser();
   const { platform: platformParam } = await searchParams;
   const activeTab = isPlatform(platformParam) ? platformParam : undefined;
 
   const approvals = await prisma.approval.findMany({
     where: {
+      accountId: currentUser.accountId,
       status: { in: ["PENDING", "EDITED"] },
       ...(activeTab ? { platform: activeTab } : {}),
     },
@@ -34,8 +36,7 @@ export default async function ApprovalsPage({
     orderBy: { createdAt: "desc" },
   });
 
-  const xConfigured = isXConfigured();
-  const bufferPlatforms = activeBufferPlatforms();
+  const bufferPlatforms = await activeBufferPlatforms(currentUser.accountId);
 
   return (
     <div>
@@ -80,7 +81,6 @@ export default async function ApprovalsPage({
         {approvals.map((approval) => (
           <ApprovalCard
             key={approval.id}
-            xConfigured={xConfigured}
             bufferPlatforms={bufferPlatforms}
             approval={{
               ...approval,

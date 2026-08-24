@@ -33,40 +33,43 @@ export interface DiscoverTrendsResult {
 }
 
 /**
- * Replaces "seed and hope" with a real trend source: Call 1 does free-form
- * web research (Delhi/Bangalore-scoped, pillar-scoped), Call 2 extracts
- * structured {topic, rawSignal} pairs from Call 1's text. Each extracted pair
- * becomes an ordinary new TrendInput row — landing as a ordinary row means the
- * existing, unmodified keyword pre-filter in trend-agent.ts already applies to
- * these exactly like manually-seeded ones, which is the reason extraction
- * lands here rather than skipping straight to a draft.
+ * Replaces "seed and hope" with a real trend source, scoped to one account's
+ * own brand: Call 1 does free-form web research (scoped entirely by that
+ * account's own KnowledgeBaseEntry content — no hardcoded city/industry/
+ * pillar names here, since this runs for any tenant's brand, not just one),
+ * Call 2 extracts structured {topic, rawSignal} pairs from Call 1's text.
+ * Each extracted pair becomes an ordinary new TrendInput row scoped to this
+ * account — landing as an ordinary row means the existing, unmodified
+ * keyword pre-filter in trend-agent.ts already applies to these exactly like
+ * manually-seeded ones, which is the reason extraction lands here rather
+ * than skipping straight to a draft.
  */
-export async function discoverTrends(): Promise<DiscoverTrendsResult> {
+export async function discoverTrends(accountId: string): Promise<DiscoverTrendsResult> {
+  const account = await prisma.account.findUnique({ where: { id: accountId } });
+  if (!account) return { ok: false, created: 0, error: "Account not found" };
+
   const kbEntries = await prisma.knowledgeBaseEntry.findMany({
-    where: {
-      title: {
-        in: ["Content Pillars, Hooks & Recurring Series", "Safety, Claims & Verification Rules"],
-      },
-    },
+    where: { accountId, key: { in: ["CONTENT_PILLARS", "SAFETY_RULES"] } },
   });
   const kbContext = kbEntries.map((e) => `## ${e.title}\n${e.content}`).join("\n\n");
 
-  const researchPrompt = `Research current, real, specific travel news/trends/stories relevant to
-OnSight's content, focused specifically on Delhi first and Bangalore second — OnSight's actual
-launch cities. Do not research other Indian cities as if they were launch-relevant.
-
-Only research within these content pillars: Hidden India (lesser-known places, local food,
-overlooked neighborhoods/history), Travel Safety (scams, price awareness — framed as useful
-empowering context, never fear-based or sensational), and India Travel Culture (festivals,
-seasonal events, local stories, cultural moments happening now). Do not research AI/product/
-company topics — that's internal content, not external trend research.
+  const researchPrompt = `Research current, real, specific news, trends, or stories relevant to
+${account.name}'s content strategy and audience — scoped entirely by the brand context below.
+Do not research topics outside what that context describes as relevant.
 
 Do not surface anything political, controversial, involving accusations or complaints against
-specific businesses or individuals, or unverified safety incidents — OnSight's content policy
-treats all of these as never-autonomous regardless of how newsworthy they are, so they're not
-useful research output here.
+specific businesses or individuals, or unverified safety incidents — this content policy treats
+all of these as never-autonomous regardless of how newsworthy they are, so they're not useful
+research output here.
 
-${kbContext ? `Brand context for what actually fits OnSight:\n${kbContext}\n\n` : ""}Find at most
+${
+  kbContext
+    ? `Brand context for what actually fits ${account.name}:\n${kbContext}\n\n`
+    : `No specific content pillars have been defined for ${account.name} yet — research generally
+interesting, safe, on-topic industry news for a business named "${account.name}" based only on
+that name and ordinary judgment, and note in your answer that more specific brand/audience
+context (via the knowledge base) would sharpen future research.\n\n`
+}Find at most
 ${MAX_NEW_TRENDS_PER_CYCLE} current, specific, genuinely interesting items. For each, write 2-3
 sentences: what it is, and why it's a good content angle. If you don't find anything genuinely
 new or interesting, say so plainly rather than forcing results.`;
@@ -75,8 +78,7 @@ new or interesting, say so plainly rather than forcing results.`;
   try {
     researchText = await researchWithWebSearch({
       userMessage: researchPrompt,
-      system:
-        "You are a careful researcher for OnSight, a travel company building an app focused on exploring India. You have real-time web search access. Be accurate and specific, and follow the scope and content-policy constraints in the request exactly — do not surface anything outside them even if it seems newsworthy.",
+      system: `You are a careful researcher for ${account.name}. You have real-time web search access. Be accurate and specific, and follow the scope and content-policy constraints in the request exactly — do not surface anything outside them even if it seems newsworthy.`,
       maxSearches: 5,
     });
   } catch (err) {
@@ -117,6 +119,7 @@ new or interesting, say so plainly rather than forcing results.`;
         required: ["trend1", "trend2", "trend3"],
       },
       zodSchema: extractionSchema,
+      system: `You are a careful research assistant for ${account.name}, extracting structured data from research notes.`,
       // researchText is treated purely as source material to extract from,
       // never as instructions — it came from the open web via Call 1's
       // search tool, so this boundary is the prompt-injection containment.
@@ -139,7 +142,7 @@ ${researchText}
     let created = 0;
     for (const t of slots) {
       await prisma.trendInput.create({
-        data: { topic: t.topic, rawSignal: t.rawSignal, source: "WEB_SEARCH" },
+        data: { accountId, topic: t.topic, rawSignal: t.rawSignal, source: "WEB_SEARCH" },
       });
       created++;
     }

@@ -1,22 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { checkPassword, createSessionToken, COOKIE_NAME, MAX_AGE_SECONDS } from "@/lib/auth/session";
+import { prisma } from "@/lib/db/prisma";
+import { verifyPassword } from "@/lib/auth/password";
+import { attachSessionCookie } from "@/lib/auth/issue-session";
+
+// Must run on the Node runtime, not edge — verifyPassword uses Node's
+// built-in crypto.scrypt, which edge doesn't support.
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
+  const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
   const password = typeof body?.password === "string" ? body.password : "";
 
-  if (!password || !checkPassword(password)) {
-    return NextResponse.json({ error: "Incorrect password" }, { status: 401 });
+  if (!email || !password) {
+    return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
   }
 
-  const token = await createSessionToken();
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user || !(await verifyPassword(password, user.passwordHash))) {
+    return NextResponse.json({ error: "Incorrect email or password" }, { status: 401 });
+  }
+
   const response = NextResponse.json({ ok: true });
-  response.cookies.set(COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: MAX_AGE_SECONDS,
-    path: "/",
-  });
-  return response;
+  return attachSessionCookie(response, user);
 }

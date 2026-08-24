@@ -1,12 +1,15 @@
 import { prisma } from "@/lib/db/prisma";
 import { ConversationCard } from "@/components/conversations/ConversationCard";
+import { requireCurrentUser } from "@/lib/auth/current-user";
 
 export const dynamic = "force-dynamic";
 
 const INTENT_ORDER: Record<string, number> = { HIGH: 0, MEDIUM: 1, LOW: 2 };
 
 export default async function ConversationsPage() {
+  const currentUser = await requireCurrentUser();
   const conversations = await prisma.conversation.findMany({
+    where: { accountId: currentUser.accountId },
     include: { approvals: { where: { status: "PENDING" }, select: { id: true } } },
     orderBy: { createdAt: "desc" },
   });

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
-import { callStructuredClaude, ClaudeRefusalError } from "@/lib/agents/claude-client";
+import { callStructuredClaude, buildSystemPrompt, ClaudeRefusalError } from "@/lib/agents/claude-client";
 import { resolveRiskTier } from "@/lib/agents/risk-tiers";
 import { INTENT_LEVELS, RISK_TIERS } from "@/lib/types";
 
@@ -60,7 +60,10 @@ export interface CommunityAgentItemResult {
   error?: string;
 }
 
-export async function runCommunityAgentOnMention(mentionId: string): Promise<CommunityAgentItemResult> {
+export async function runCommunityAgentOnMention(
+  accountId: string,
+  mentionId: string,
+): Promise<CommunityAgentItemResult> {
   const mention = await prisma.mockMention.findUnique({ where: { id: mentionId } });
   if (!mention) return { mentionId, ok: false, error: "Mention not found" };
 
@@ -69,22 +72,24 @@ export async function runCommunityAgentOnMention(mentionId: string): Promise<Com
 
   let analysis: z.infer<typeof analysisSchema>;
   try {
+    const system = await buildSystemPrompt(accountId);
     analysis = await callStructuredClaude({
       toolName: "record_conversation_analysis",
       toolDescription:
         "Records intent analysis and a draft reply for a social mention, including a risk self-assessment.",
       inputSchema,
       zodSchema: analysisSchema,
+      system,
       userMessage: `Analyze this X mention and decide whether/how to reply.
 
 Author: @${mention.authorHandle} (${mention.authorName})
 Text: "${mention.text}"
 Likes: ${mention.likes}, Replies: ${mention.replyCount}
 
-Score the intent, identify the topic, decide if this looks like a potential OnSight customer,
-self-assess the risk tier, and draft a reply if appropriate. If you draft a reply, it must be
-280 characters or fewer, including spaces and punctuation — X's hard limit, not a suggestion.
-Count carefully; leave margin rather than write right up to the edge.`,
+Score the intent, identify the topic, decide if this looks like a potential customer, self-assess
+the risk tier, and draft a reply if appropriate. If you draft a reply, it must be 280 characters
+or fewer, including spaces and punctuation — X's hard limit, not a suggestion. Count carefully;
+leave margin rather than write right up to the edge.`,
     });
   } catch (err) {
     // Fail-safe invariant: if classification errors for any reason (rate
@@ -104,6 +109,7 @@ Count carefully; leave margin rather than write right up to the edge.`,
 
   const conversation = await prisma.conversation.create({
     data: {
+      accountId,
       sourceMentionId: mention.id,
       authorHandle: mention.authorHandle,
       authorName: mention.authorName,
@@ -127,6 +133,7 @@ Count carefully; leave margin rather than write right up to the edge.`,
   if (!isNever && analysis.draftReply) {
     await prisma.approval.create({
       data: {
+        accountId,
         type: "REPLY",
         platform: "X",
         content: analysis.draftReply,
@@ -141,15 +148,15 @@ Count carefully; leave margin rather than write right up to the edge.`,
   return { mentionId, ok: true };
 }
 
-export async function runCommunityAgent(): Promise<CommunityAgentItemResult[]> {
+export async function runCommunityAgent(accountId: string): Promise<CommunityAgentItemResult[]> {
   const unprocessed = await prisma.mockMention.findMany({
-    where: { conversation: null },
+    where: { accountId, conversation: null },
     select: { id: true },
   });
 
   const results: CommunityAgentItemResult[] = [];
   for (const mention of unprocessed) {
-    results.push(await runCommunityAgentOnMention(mention.id));
+    results.push(await runCommunityAgentOnMention(accountId, mention.id));
   }
   return results;
 }

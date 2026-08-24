@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { put } from "@vercel/blob";
+import { getCurrentUser } from "@/lib/auth/current-user";
 
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
 export async function POST(request: NextRequest) {
+  const currentUser = await getCurrentUser();
+  if (!currentUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const form = await request.formData().catch(() => null);
   const file = form?.get("file");
 

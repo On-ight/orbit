@@ -7,14 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:seed": "tsx prisma/seed.ts",
     "buffer:channels": "tsx --env-file=.env.local scripts/list-buffer-channels.ts",
-    "kb:seed": "tsx --env-file=.env.local scripts/seed-knowledge-base.ts",
+    "backfill:onsight": "tsx --env-file=.env.local scripts/backfill-onsight-account.ts",
     "postinstall": "prisma generate",
     "vercel-build": "prisma generate && prisma migrate deploy && next build"
-  },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",

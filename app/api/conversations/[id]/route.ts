@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { getCurrentUser } from "@/lib/auth/current-user";
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const currentUser = await getCurrentUser();
+  if (!currentUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const { id } = await params;
   const body = await request.json().catch(() => null);
   const action = body?.action as string | undefined;
@@ -14,7 +18,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     where: { id },
     include: { approvals: { where: { status: "PENDING" } } },
   });
-  if (!conversation) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!conversation || conversation.accountId !== currentUser.accountId) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
 
   await prisma.$transaction([
     prisma.conversation.update({ where: { id }, data: { status: "IGNORED" } }),

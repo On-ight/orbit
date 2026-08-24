@@ -1,5 +1,13 @@
 // Uses Web Crypto (not Node's `crypto` module) so this also works unmodified
-// inside Next.js middleware, which runs on the edge runtime.
+// inside proxy.ts, which runs on the edge runtime.
+//
+// The token carries identity only (userId + tokenVersion) — never mutable
+// authorization state (isAdmin, plan/subscription status). Those get checked
+// live against the database wherever they matter (see lib/auth/current-user.ts),
+// so revoking a user (password change, suspension) takes effect immediately by
+// bumping User.tokenVersion, without needing to rotate SESSION_SECRET and log
+// every session out at once. This file only answers "is this cookie a real,
+// unexpired, untampered session" — not "is this account allowed to do X."
 
 const COOKIE_NAME = "occ_session";
 const MAX_AGE_SECONDS = 60 * 60 * 24 * 7; // 7 days
@@ -33,30 +41,43 @@ function timingSafeEqualStr(a: string, b: string): boolean {
   return mismatch === 0;
 }
 
-export async function createSessionToken(): Promise<string> {
-  const issuedAt = Date.now().toString();
-  const signature = await hmacHex(issuedAt);
-  return `${issuedAt}.${signature}`;
+export interface SessionPayload {
+  userId: string;
+  tokenVersion: number;
 }
 
-export async function verifySessionToken(token: string | undefined | null): Promise<boolean> {
-  if (!token) return false;
-  const [issuedAt, signature] = token.split(".");
-  if (!issuedAt || !signature) return false;
+export async function createSessionToken(payload: SessionPayload): Promise<string> {
+  const issuedAt = Date.now().toString();
+  const body = `${payload.userId}.${payload.tokenVersion}.${issuedAt}`;
+  const signature = await hmacHex(body);
+  return `${body}.${signature}`;
+}
 
-  const expected = await hmacHex(issuedAt);
-  if (!timingSafeEqualStr(expected, signature)) return false;
+/**
+ * Verifies signature + expiry only — this is the cheap, DB-free check
+ * appropriate for proxy.ts's edge runtime. It does NOT confirm the user still
+ * exists, isn't suspended, or that tokenVersion still matches the live row;
+ * callers that need those guarantees must check the live User row (see
+ * lib/auth/current-user.ts).
+ */
+export async function verifySessionToken(token: string | undefined | null): Promise<SessionPayload | null> {
+  if (!token) return null;
+  const parts = token.split(".");
+  if (parts.length !== 4) return null;
+  const [userId, tokenVersionStr, issuedAt, signature] = parts;
+  if (!userId || !tokenVersionStr || !issuedAt || !signature) return null;
+
+  const body = `${userId}.${tokenVersionStr}.${issuedAt}`;
+  const expected = await hmacHex(body);
+  if (!timingSafeEqualStr(expected, signature)) return null;
 
   const age = Date.now() - Number(issuedAt);
-  if (Number.isNaN(age) || age < 0 || age > MAX_AGE_SECONDS * 1000) return false;
+  if (Number.isNaN(age) || age < 0 || age > MAX_AGE_SECONDS * 1000) return null;
 
-  return true;
-}
+  const tokenVersion = Number(tokenVersionStr);
+  if (!Number.isInteger(tokenVersion)) return null;
 
-export function checkPassword(candidate: string): boolean {
-  const expected = process.env.DASHBOARD_PASSWORD;
-  if (!expected) throw new Error("DASHBOARD_PASSWORD is not set");
-  return timingSafeEqualStr(expected, candidate);
+  return { userId, tokenVersion };
 }
 
 export { COOKIE_NAME, MAX_AGE_SECONDS };

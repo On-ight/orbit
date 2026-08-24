@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/prisma";
+import { requireCurrentUser } from "@/lib/auth/current-user";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,11 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export default async function ContentPage() {
-  const posts = await prisma.post.findMany({ orderBy: { createdAt: "desc" } });
+  const currentUser = await requireCurrentUser();
+  const posts = await prisma.post.findMany({
+    where: { accountId: currentUser.accountId },
+    orderBy: { createdAt: "desc" },
+  });
 
   return (
     <div>

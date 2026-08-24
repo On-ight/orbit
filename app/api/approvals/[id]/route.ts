@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { isXConfigured, publishPostToX } from "@/lib/publishing/x-client";
+import { getCurrentUser } from "@/lib/auth/current-user";
 import {
   BufferPlatform,
   isBufferConfiguredForPlatform,
@@ -12,13 +12,16 @@ type Action = "approve" | "reject" | "edit";
 const BUFFER_PLATFORMS: BufferPlatform[] = ["X", "THREADS", "LINKEDIN"];
 
 interface LivePublishResult {
-  publishedVia: "BUFFER" | "X";
+  publishedVia: "BUFFER";
   platformPostId: string;
   publishedUrl: string | null;
   scheduledFor: Date | null;
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const currentUser = await getCurrentUser();
+  if (!currentUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const { id } = await params;
   const body = await request.json().catch(() => null);
   const action = body?.action as Action | undefined;
@@ -31,7 +34,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   const approval = await prisma.approval.findUnique({ where: { id } });
-  if (!approval) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  // Not found and "belongs to someone else" both come back as 404 — don't
+  // reveal that a given id exists under another tenant's account.
+  if (!approval || approval.accountId !== currentUser.accountId) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
 
   if (action === "edit") {
     if (editedContent === undefined && imageUrlInput === undefined) {
@@ -55,18 +62,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const finalImageUrl = imageUrlInput ?? approval.imageUrl ?? undefined;
 
   if (action === "approve") {
-    // Publishing priority: Buffer first (handles any connected platform plus
-    // real scheduling and, for LinkedIn, an attached image), then direct X
-    // (POST only, X platform only, always immediate — X's basic post
-    // endpoint has no scheduling of its own), then simulated. If the live
-    // call fails, nothing is marked approved so the item stays in the queue
-    // and can be retried.
+    // Publishing goes through Buffer only — every tenant publishes exclusively
+    // via their own connected AccountBufferChannel, never a global fallback
+    // credential, so one tenant can never accidentally post through another's
+    // (or Orbit's own) connected account. If the live call fails, nothing is
+    // marked approved so the item stays in the queue and can be retried.
     let livePublish: LivePublishResult | null = null;
     const bufferPlatform = BUFFER_PLATFORMS.find((p) => p === approval.platform);
 
-    if (bufferPlatform && isBufferConfiguredForPlatform(bufferPlatform)) {
+    if (bufferPlatform && (await isBufferConfiguredForPlatform(currentUser.accountId, bufferPlatform))) {
       try {
         const result = await schedulePostToBuffer(
+          currentUser.accountId,
           finalContent,
           bufferPlatform,
           scheduledForInput,
@@ -81,21 +88,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       } catch (err) {
         return NextResponse.json(
           { error: `Failed to schedule via Buffer: ${String(err)}` },
-          { status: 502 },
-        );
-      }
-    } else if (approval.platform === "X" && approval.type === "POST" && approval.postId && isXConfigured()) {
-      try {
-        const result = await publishPostToX(finalContent);
-        livePublish = {
-          publishedVia: "X",
-          platformPostId: result.platformPostId,
-          publishedUrl: result.url,
-          scheduledFor: null,
-        };
-      } catch (err) {
-        return NextResponse.json(
-          { error: `Failed to publish to X: ${String(err)}` },
           { status: 502 },
         );
       }

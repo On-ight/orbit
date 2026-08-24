@@ -6,17 +6,20 @@ export async function proxy(request: NextRequest) {
 
   const isPublic =
     pathname === "/login" ||
+    pathname === "/signup" ||
     pathname.startsWith("/api/auth/login") ||
+    pathname.startsWith("/api/auth/signup") ||
     pathname.startsWith("/api/cron") ||
+    pathname.startsWith("/api/webhooks") ||
     pathname.startsWith("/_next") ||
     pathname === "/favicon.ico";
 
   if (isPublic) return NextResponse.next();
 
   const token = request.cookies.get(COOKIE_NAME)?.value;
-  const valid = await verifySessionToken(token);
+  const payload = await verifySessionToken(token);
 
-  if (!valid) {
+  if (!payload) {
     if (pathname.startsWith("/api")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

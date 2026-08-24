@@ -11,25 +11,29 @@ export interface AgentRunResult {
 }
 
 /**
- * Transport-agnostic orchestration entrypoint — no dependency on
- * Request/Response, so it can be called identically from a manual API
- * route (v1), a future cron-triggered route, or a queue worker, without
- * touching this function.
+ * Transport-agnostic orchestration entrypoint for ONE account — no
+ * dependency on Request/Response, so it can be called identically from a
+ * manual API route, the daily cron route (which iterates every active
+ * account and calls this once per account, isolated), or a future queue
+ * worker, without touching this function.
  *
  * Each agent already isolates failures per-item internally; this function
  * additionally isolates failures per-agent so one agent's total failure
- * doesn't prevent the others from running.
+ * doesn't prevent the others from running for this account.
  */
-export async function runAgentCycle(triggeredBy: "MANUAL" | "CRON" = "MANUAL"): Promise<AgentRunResult> {
+export async function runAgentCycle(
+  accountId: string,
+  triggeredBy: "MANUAL" | "CRON" = "MANUAL",
+): Promise<AgentRunResult> {
   const run = await prisma.agentRun.create({
-    data: { triggeredBy, status: "RUNNING" },
+    data: { accountId, triggeredBy, status: "RUNNING" },
   });
 
   const parts: string[] = [];
   let hadError = false;
 
   try {
-    const discovery = await discoverTrends();
+    const discovery = await discoverTrends(accountId);
     parts.push(
       discovery.ok
         ? `Trend Discovery: ${discovery.created} new trend(s) found`
@@ -41,7 +45,7 @@ export async function runAgentCycle(triggeredBy: "MANUAL" | "CRON" = "MANUAL"): 
   }
 
   try {
-    const trendResults = await runTrendAgent();
+    const trendResults = await runTrendAgent(accountId);
     const trendFailures = trendResults.filter((r) => !r.ok).length;
     parts.push(`Trend Agent: ${trendResults.length} processed, ${trendFailures} failed`);
   } catch (err) {
@@ -50,7 +54,7 @@ export async function runAgentCycle(triggeredBy: "MANUAL" | "CRON" = "MANUAL"): 
   }
 
   try {
-    const contentResults = await runContentAgent();
+    const contentResults = await runContentAgent(accountId);
     const contentFailures = contentResults.filter((r) => !r.ok).length;
     parts.push(`Content Agent: ${contentResults.length} processed, ${contentFailures} failed`);
   } catch (err) {
@@ -59,7 +63,7 @@ export async function runAgentCycle(triggeredBy: "MANUAL" | "CRON" = "MANUAL"): 
   }
 
   try {
-    const communityResults = await runCommunityAgent();
+    const communityResults = await runCommunityAgent(accountId);
     const communityFailures = communityResults.filter((r) => !r.ok).length;
     parts.push(`Community Agent: ${communityResults.length} processed, ${communityFailures} failed`);
   } catch (err) {

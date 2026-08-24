@@ -1,33 +1,49 @@
 import { Platform } from "@/lib/types";
+import { prisma } from "@/lib/db/prisma";
 
 const BUFFER_API_URL = "https://api.buffer.com";
 
 export type BufferPlatform = Platform;
 
-const CHANNEL_ENV_VAR: Record<BufferPlatform, string> = {
-  X: "BUFFER_X_CHANNEL_ID",
-  THREADS: "BUFFER_THREADS_CHANNEL_ID",
-  LINKEDIN: "BUFFER_LINKEDIN_CHANNEL_ID",
-};
+// One shared Orbit-owned Buffer account/API key serves every tenant — each
+// customer's connected channel is manually added to it (see
+// scripts/assign-buffer-channel.ts) and recorded per-account in
+// AccountBufferChannel, since Buffer's own OAuth app registration for new
+// developers is closed (no self-serve "connect your account" flow is
+// possible directly against Buffer's API today).
 
-/** True if Buffer is usable at all — at least one platform channel configured. */
-export function isBufferConfigured(): boolean {
+/** True if Buffer is usable at all for this account — at least one platform channel assigned. */
+export async function isBufferConfigured(accountId: string): Promise<boolean> {
   if (!process.env.BUFFER_API_KEY) return false;
-  return (Object.keys(CHANNEL_ENV_VAR) as BufferPlatform[]).some((p) => isBufferConfiguredForPlatform(p));
+  const count = await prisma.accountBufferChannel.count({ where: { accountId } });
+  return count > 0;
 }
 
-export function isBufferConfiguredForPlatform(platform: BufferPlatform): boolean {
-  return Boolean(process.env.BUFFER_API_KEY && process.env[CHANNEL_ENV_VAR[platform]]);
+export async function isBufferConfiguredForPlatform(
+  accountId: string,
+  platform: BufferPlatform,
+): Promise<boolean> {
+  if (!process.env.BUFFER_API_KEY) return false;
+  const channel = await prisma.accountBufferChannel.findUnique({
+    where: { accountId_platform: { accountId, platform } },
+  });
+  return Boolean(channel);
 }
 
-export function activeBufferPlatforms(): BufferPlatform[] {
-  return (Object.keys(CHANNEL_ENV_VAR) as BufferPlatform[]).filter((p) => isBufferConfiguredForPlatform(p));
+export async function activeBufferPlatforms(accountId: string): Promise<BufferPlatform[]> {
+  if (!process.env.BUFFER_API_KEY) return [];
+  const channels = await prisma.accountBufferChannel.findMany({ where: { accountId } });
+  return channels.map((c) => c.platform as BufferPlatform);
 }
 
-function getChannelId(platform: BufferPlatform): string {
-  const channelId = process.env[CHANNEL_ENV_VAR[platform]];
-  if (!channelId) throw new Error(`${CHANNEL_ENV_VAR[platform]} is not set`);
-  return channelId;
+async function getChannelId(accountId: string, platform: BufferPlatform): Promise<string> {
+  const channel = await prisma.accountBufferChannel.findUnique({
+    where: { accountId_platform: { accountId, platform } },
+  });
+  if (!channel) {
+    throw new Error(`No Buffer channel configured for this account on ${platform}`);
+  }
+  return channel.bufferChannelId;
 }
 
 interface GraphQLResponse<T> {
@@ -64,7 +80,13 @@ export interface BufferChannel {
   service: string;
 }
 
-/** Lists channels connected to the API key's organization — used once to find each platform's channel ID for .env.local. */
+/**
+ * Lists every channel connected to Orbit's one shared Buffer account —
+ * used by the founder (via scripts/list-buffer-channels.ts) to find a newly
+ * connected customer's channel id after manually adding it in Buffer's own
+ * dashboard, then assigning it to that customer's account via
+ * scripts/assign-buffer-channel.ts.
+ */
 export async function listBufferChannels(): Promise<BufferChannel[]> {
   const orgData = await bufferGraphQL<{ account: { organizations: { id: string; name: string }[] } }>(
     `query { account { organizations { id name } } }`,
@@ -87,22 +109,24 @@ export interface ScheduledBufferPost {
 }
 
 /**
- * Schedules a post through Buffer on the given platform's connected channel.
- * If dueAt is provided, it's scheduled for that exact time (customScheduled);
- * otherwise it's added to Buffer's queue for the next available slot.
- * imageUrl (LinkedIn only in practice) must be a publicly reachable,
- * non-expiring URL — Buffer fetches it at actual publish time, which for a
- * scheduled post can be hours or days later, so a signed/expiring URL will
- * fail silently down the line. Throws on failure — callers must not mark
- * anything as published/scheduled unless this resolves successfully.
+ * Schedules a post through Buffer on this account's connected channel for
+ * the given platform. If dueAt is provided, it's scheduled for that exact
+ * time (customScheduled); otherwise it's added to Buffer's queue for the
+ * next available slot. imageUrl (LinkedIn only in practice) must be a
+ * publicly reachable, non-expiring URL — Buffer fetches it at actual publish
+ * time, which for a scheduled post can be hours or days later, so a signed/
+ * expiring URL will fail silently down the line. Throws on failure — callers
+ * must not mark anything as published/scheduled unless this resolves
+ * successfully.
  */
 export async function schedulePostToBuffer(
+  accountId: string,
   content: string,
   platform: BufferPlatform,
   dueAt?: Date,
   imageUrl?: string,
 ): Promise<ScheduledBufferPost> {
-  const channelId = getChannelId(platform);
+  const channelId = await getChannelId(accountId, platform);
 
   const input: Record<string, unknown> = {
     text: content,

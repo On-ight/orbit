@@ -1,8 +1,8 @@
 import { prisma } from "@/lib/db/prisma";
 import { RunCycleButton } from "@/components/settings/RunCycleButton";
 import { KnowledgeBaseManager } from "@/components/settings/KnowledgeBaseManager";
-import { isXConfigured } from "@/lib/publishing/x-client";
 import { isBufferConfigured, isBufferConfiguredForPlatform } from "@/lib/publishing/buffer-client";
+import { requireCurrentUser } from "@/lib/auth/current-user";
 import { PLATFORMS } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -45,13 +45,18 @@ const TIER_GROUPS: { tier: string; label: string; color: string; actions: string
 const PLATFORM_LABEL: Record<string, string> = { X: "X (Twitter)", THREADS: "Threads", LINKEDIN: "LinkedIn" };
 
 export default async function SettingsPage() {
-  const [runs, hasApiKey, xConfigured, bufferConfigured, knowledgeBaseEntries] = await Promise.all([
-    prisma.agentRun.findMany({ orderBy: { startedAt: "desc" }, take: 10 }),
+  const currentUser = await requireCurrentUser();
+  const { accountId } = currentUser;
+
+  const [runs, hasApiKey, bufferConfigured, platformConnections, knowledgeBaseEntries] = await Promise.all([
+    prisma.agentRun.findMany({ where: { accountId }, orderBy: { startedAt: "desc" }, take: 10 }),
     Promise.resolve(Boolean(process.env.ANTHROPIC_API_KEY)),
-    Promise.resolve(isXConfigured()),
-    Promise.resolve(isBufferConfigured()),
-    prisma.knowledgeBaseEntry.findMany({ orderBy: { createdAt: "asc" } }),
+    isBufferConfigured(accountId),
+    Promise.all(PLATFORMS.map(async (p) => [p, await isBufferConfiguredForPlatform(accountId, p)] as const)),
+    prisma.knowledgeBaseEntry.findMany({ where: { accountId }, orderBy: { createdAt: "asc" } }),
   ]);
+
+  const connectedByPlatform = Object.fromEntries(platformConnections);
 
   return (
     <div>
@@ -66,27 +71,27 @@ export default async function SettingsPage() {
               className="font-medium"
               style={{ color: hasApiKey ? "var(--status-good)" : "var(--status-critical)" }}
             >
-              {hasApiKey ? "configured" : "missing — set ANTHROPIC_API_KEY in .env.local"}
+              {hasApiKey ? "configured" : "missing — contact support"}
             </span>
           </p>
           <div>
             <p className="mb-1">
-              Buffer:{" "}
+              Publishing:{" "}
               <span
                 className="font-medium"
-                style={{ color: bufferConfigured ? "var(--status-good)" : "var(--text-muted)" }}
+                style={{ color: bufferConfigured ? "var(--status-good)" : "var(--status-warning)" }}
               >
-                {bufferConfigured ? "connected" : "not connected"}
+                {bufferConfigured ? "connected" : "setting up"}
               </span>
             </p>
             <ul className="ml-4 list-disc space-y-0.5 text-[var(--text-secondary)]">
               {PLATFORMS.map((p) => {
-                const connected = isBufferConfiguredForPlatform(p);
+                const connected = connectedByPlatform[p];
                 return (
                   <li key={p}>
                     {PLATFORM_LABEL[p]}:{" "}
                     <span style={{ color: connected ? "var(--status-good)" : "var(--text-muted)" }}>
-                      {connected ? "channel connected" : "not connected"}
+                      {connected ? "connected" : "not connected yet"}
                     </span>
                   </li>
                 );
@@ -94,42 +99,18 @@ export default async function SettingsPage() {
             </ul>
             {!bufferConfigured && (
               <p className="mt-1 text-[var(--text-muted)]">
-                Set BUFFER_API_KEY plus BUFFER_X_CHANNEL_ID / BUFFER_THREADS_CHANNEL_ID /
-                BUFFER_LINKEDIN_CHANNEL_ID in .env.local (run{" "}
-                <code className="text-[var(--text-secondary)]">npm run buffer:channels</code> to find
-                each id). Buffer takes priority over direct X posting per-platform, and is the only
-                path with real scheduling, Threads, and LinkedIn image attachment.
+                We&apos;re setting up your connected accounts — this happens by hand shortly after
+                you subscribe. Reach out if it&apos;s been more than a day or two.
               </p>
             )}
           </div>
-          <p>
-            X (Twitter) direct:{" "}
-            <span
-              className="font-medium"
-              style={{ color: xConfigured ? "var(--status-good)" : "var(--text-muted)" }}
-            >
-              {xConfigured
-                ? isBufferConfiguredForPlatform("X")
-                  ? "connected — unused while Buffer's X channel is connected"
-                  : "connected — approved posts publish live, immediately"
-                : "not connected — approved posts stay simulated"}
-            </span>
-            {!xConfigured && (
-              <span className="block text-[var(--text-muted)]">
-                Set X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET in .env.local
-                (OAuth 1.0a user-context credentials from the X Developer Portal, app
-                permissions set to Read and Write). Only used for posts, and only when
-                Buffer isn&apos;t connected for X specifically.
-              </span>
-            )}
-          </p>
         </div>
       </section>
 
       <section className="mt-6 rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-5">
         <h2 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Run agent cycle</h2>
         <p className="mb-4 text-xs text-[var(--text-muted)]">
-          Runs automatically every morning at 6am IST via a Vercel cron job (look for{" "}
+          Runs automatically every morning at 6am IST via a scheduled job (look for{" "}
           <span className="font-medium text-[var(--text-secondary)]">CRON</span>-triggered runs
           below). You can also trigger one manually any time — the Trend, Content, and Community
           agents will process whatever&apos;s new, including fresh live-web-search trend research.
