@@ -39,10 +39,11 @@ model Account {
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
-  passwordHash String
-  // Bumped on password change/suspension so existing signed cookies stop
-  // being trusted without needing a global SESSION_SECRET rotation.
-  tokenVersion Int      @default(0)
+  // Firebase Auth owns credentials/password policy/breach detection — this
+  // is the join key back to that identity. Revocation (password change,
+  // suspension) is handled by Firebase's own refresh-token revocation, not a
+  // local version counter.
+  firebaseUid  String   @unique
   isAdmin      Boolean  @default(false)
 
   accountId    String

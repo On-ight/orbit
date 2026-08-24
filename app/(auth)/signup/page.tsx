@@ -3,6 +3,8 @@
 import { useState, FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { clientAuth } from "@/lib/firebase/client";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -17,17 +19,36 @@ export default function SignupPage() {
     setLoading(true);
     setError(null);
 
-    const res = await fetch("/api/auth/signup", {
+    let credential;
+    try {
+      credential = await createUserWithEmailAndPassword(clientAuth, email, password);
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code;
+      setError(
+        code === "auth/email-already-in-use"
+          ? "An account with that email already exists."
+          : code === "auth/weak-password"
+            ? "Password must be at least 6 characters."
+            : "Something went wrong.",
+      );
+      setLoading(false);
+      return;
+    }
+
+    const idToken = await credential.user.getIdToken();
+    const res = await fetch("/api/auth/session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ accountName, email, password }),
+      body: JSON.stringify({ idToken, accountName }),
     });
 
-    setLoading(false);
-
     if (!res.ok) {
+      // Orbit-side account creation failed after Firebase succeeded — undo
+      // the Firebase signup so retrying isn't blocked by "email in use".
+      await credential.user.delete().catch(() => {});
       const data = await res.json().catch(() => null);
       setError(data?.error ?? "Something went wrong.");
+      setLoading(false);
       return;
     }
 
@@ -81,7 +102,7 @@ export default function SignupPage() {
           onChange={(e) => setPassword(e.target.value)}
           className="mb-1 w-full rounded-md border border-neutral-700 bg-neutral-950 px-3 py-2 text-neutral-100 outline-none focus:border-emerald-500"
         />
-        <p className="mb-4 text-xs text-neutral-600">At least 8 characters.</p>
+        <p className="mb-4 text-xs text-neutral-600">At least 6 characters.</p>
 
         {error && <p className="mb-4 text-sm text-red-400">{error}</p>}
 

@@ -3,6 +3,8 @@
 import { useState, FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { clientAuth } from "@/lib/firebase/client";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -16,22 +18,29 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
 
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
+    try {
+      const credential = await signInWithEmailAndPassword(clientAuth, email, password);
+      const idToken = await credential.user.getIdToken();
 
-    setLoading(false);
+      const res = await fetch("/api/auth/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken }),
+      });
 
-    if (!res.ok) {
-      const data = await res.json().catch(() => null);
-      setError(data?.error ?? "Incorrect email or password.");
-      return;
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setError(data?.error ?? "Incorrect email or password.");
+        setLoading(false);
+        return;
+      }
+
+      router.push("/dashboard");
+      router.refresh();
+    } catch {
+      setError("Incorrect email or password.");
+      setLoading(false);
     }
-
-    router.push("/");
-    router.refresh();
   }
 
   return (
