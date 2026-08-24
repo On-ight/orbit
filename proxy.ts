@@ -19,7 +19,12 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/api/cron") ||
     pathname.startsWith("/api/webhooks") ||
     pathname.startsWith("/_next") ||
-    pathname === "/favicon.ico";
+    pathname === "/favicon.ico" ||
+    pathname === "/icon.png" ||
+    // Static assets referenced from public pages (e.g. the logo on the
+    // landing page) — images/icons carry no sensitive data, safe to serve
+    // regardless of auth state.
+    /\.(png|jpg|jpeg|svg|ico|webp|gif)$/.test(pathname);
 
   if (isPublic) return NextResponse.next();
 

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 const SEGMENTS = [
@@ -53,7 +54,7 @@ export default function LandingPage() {
     <div className="min-h-screen bg-white text-neutral-900">
       <header className="border-b border-neutral-200">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-          <span className="text-lg font-semibold tracking-tight">Orbit</span>
+          <Image src="/orbit-logo.png" alt="Orbit" width={612} height={408} priority className="h-9 w-auto" />
           <nav className="flex items-center gap-6">
             <Link href="/login" className="text-sm font-medium text-neutral-600 hover:text-neutral-900">
               Sign in

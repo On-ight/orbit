@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -24,10 +25,8 @@ export function Sidebar() {
   return (
     <aside className="flex h-full w-56 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface-1)]">
       <div className="px-5 py-5">
-        <p className="text-xs font-semibold uppercase tracking-widest text-[var(--text-muted)]">
-          Orbit
-        </p>
-        <p className="text-sm font-medium text-[var(--text-primary)]">Growth Command Center</p>
+        <Image src="/orbit-logo.png" alt="Orbit" width={612} height={408} className="h-7 w-auto" />
+        <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">Growth Command Center</p>
       </div>
 
       <nav className="flex-1 px-2">
