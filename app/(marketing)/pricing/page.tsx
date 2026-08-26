@@ -1,5 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { getCurrentUser } from "@/lib/auth/current-user";
+import { PLAN_PRICING, type PlanTier } from "@/lib/billing/pricing";
+import { SubscribeButton } from "@/components/billing/SubscribeButton";
 
 export const metadata: Metadata = {
   title: "Pricing",
@@ -7,8 +10,9 @@ export const metadata: Metadata = {
     "Orbit AI plans for solo founders, growing teams, and agencies managing multiple client accounts across X, Threads, and LinkedIn.",
 };
 
-const TIERS = [
+const TIERS: { tier: PlanTier; name: string; audience: string; features: string[] }[] = [
   {
+    tier: "STARTER",
     name: "Starter",
     audience: "Solo founders and indie hackers",
     features: [
@@ -19,6 +23,7 @@ const TIERS = [
     ],
   },
   {
+    tier: "GROWTH",
     name: "Growth",
     audience: "Small teams and growing startups",
     features: [
@@ -29,6 +34,7 @@ const TIERS = [
     ],
   },
   {
+    tier: "AGENCY",
     name: "Agency",
     audience: "Agencies managing multiple client accounts",
     features: [
@@ -40,7 +46,9 @@ const TIERS = [
   },
 ];
 
-export default function PricingPage() {
+export default async function PricingPage() {
+  const currentUser = await getCurrentUser();
+
   return (
     <>
       <section className="mx-auto max-w-4xl px-6 py-20 text-center">
@@ -48,7 +56,9 @@ export default function PricingPage() {
           Plans that grow with you
         </h1>
         <p className="mt-6 text-lg text-neutral-600">
-          Start free, see what Orbit AI drafts for your brand, and go from there.
+          {currentUser
+            ? "Pick a plan to activate your workspace."
+            : "Start free, see what Orbit AI drafts for your brand, and go from there."}
         </p>
       </section>
 
@@ -59,6 +69,7 @@ export default function PricingPage() {
               <div key={tier.name} className="rounded-xl border border-neutral-200 bg-white p-6">
                 <p className="text-lg font-semibold">{tier.name}</p>
                 <p className="mt-1 text-sm text-neutral-500">{tier.audience}</p>
+                <p className="mt-4 text-2xl font-semibold">{PLAN_PRICING[tier.tier].label}</p>
                 <ul className="mt-6 space-y-3">
                   {tier.features.map((feature) => (
                     <li key={feature} className="flex items-start gap-2 text-sm text-neutral-600">
@@ -67,18 +78,26 @@ export default function PricingPage() {
                     </li>
                   ))}
                 </ul>
-                <Link
-                  href="/signup"
-                  className="mt-8 block rounded-md bg-neutral-900 px-4 py-2 text-center text-sm font-medium text-white transition hover:bg-neutral-700"
-                >
-                  Start free
-                </Link>
+                <div className="mt-8">
+                  {currentUser ? (
+                    <SubscribeButton planTier={tier.tier} accountName={currentUser.account.name} />
+                  ) : (
+                    <Link
+                      href="/signup"
+                      className="block rounded-md bg-neutral-900 px-4 py-2 text-center text-sm font-medium text-white transition hover:bg-neutral-700"
+                    >
+                      Start free
+                    </Link>
+                  )}
+                </div>
               </div>
             ))}
           </div>
-          <p className="mt-10 text-center text-sm text-neutral-500">
-            Self-serve billing is rolling out now — sign up and your workspace will be ready to go.
-          </p>
+          {!currentUser && (
+            <p className="mt-10 text-center text-sm text-neutral-500">
+              Sign up first, then come back here to activate a plan.
+            </p>
+          )}
         </div>
       </section>
     </>

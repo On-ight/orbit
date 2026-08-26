@@ -20,6 +20,10 @@ model Account {
   subscriptionStatus   String    @default("incomplete") // incomplete | active | past_due | canceled
   stripeCustomerId     String?
   stripeSubscriptionId String?
+  // Razorpay Standard Checkout — set once the most recent payment's
+  // signature has been verified server-side (never on the client's say-so).
+  razorpayOrderId      String?
+  razorpayPaymentId    String?
 
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
