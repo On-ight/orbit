@@ -16,14 +16,14 @@ const USD_PRICING: Record<PlanTier, TierPricing> = {
   AGENCY: { amountMinorUnits: 15_990, currency: "USD", label: "$159.90/month" },
 };
 
-// PLACEHOLDER — INR tiers for the domestic track. NOT confirmed real
-// pricing (carried over from an earlier guess purely so this track has
-// something non-zero to test end-to-end against). Replace with real
-// amounts before any Indian visitor can actually reach checkout.
+// INR tiers — direct conversion from the USD tiers at ~87 INR/USD, rounded
+// to the nearest rupee. Not an independently-set domestic price; it moves
+// if the USD tiers change or the exchange rate drifts, so revisit this
+// periodically rather than treating it as fixed.
 const INR_PRICING: Record<PlanTier, TierPricing> = {
-  STARTER: { amountMinorUnits: 99_900, currency: "INR", label: "₹999/month" },
-  GROWTH: { amountMinorUnits: 299_900, currency: "INR", label: "₹2,999/month" },
-  AGENCY: { amountMinorUnits: 799_900, currency: "INR", label: "₹7,999/month" },
+  STARTER: { amountMinorUnits: 434_100, currency: "INR", label: "₹4,341/month" },
+  GROWTH: { amountMinorUnits: 869_100, currency: "INR", label: "₹8,691/month" },
+  AGENCY: { amountMinorUnits: 1_391_100, currency: "INR", label: "₹13,911/month" },
 };
 
 export const PLAN_PRICING: Record<BillingCurrency, Record<PlanTier, TierPricing>> = {
