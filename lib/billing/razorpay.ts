@@ -1,13 +1,21 @@
 import Razorpay from "razorpay";
 
-// Constructed per call rather than a module-level singleton so a missing
-// env var throws clearly inside the route handler that needs it, instead of
-// at import time wherever this module happens to get pulled in.
+// The SDK opens a fresh axios instance (its own HTTP agent) on every `new
+// Razorpay()` — constructing one per call, as this used to do, piles up
+// listeners on reused keep-alive sockets under repeated requests (Node's
+// MaxListenersExceededWarning). Cached after first construction; env vars
+// are still validated on every call so a missing one throws clearly, only
+// the actual client construction is skipped after the first time.
+let cachedClient: Razorpay | null = null;
+
 export function getRazorpayClient(): Razorpay {
   const key_id = process.env.RAZORPAY_KEY_ID;
   const key_secret = process.env.RAZORPAY_KEY_SECRET;
   if (!key_id || !key_secret) {
     throw new Error("Razorpay is not configured — set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.");
   }
-  return new Razorpay({ key_id, key_secret });
+  if (!cachedClient) {
+    cachedClient = new Razorpay({ key_id, key_secret });
+  }
+  return cachedClient;
 }
