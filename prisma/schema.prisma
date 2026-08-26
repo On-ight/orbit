@@ -76,20 +76,22 @@ model AccountBufferChannel {
 }
 
 model AccountSocialToken {
-  id                String   @id @default(cuid())
-  accountId         String
-  account           Account  @relation(fields: [accountId], references: [id])
-  platform          String   // X only for now — direct OAuth, not Buffer
-  // Encrypted (lib/security/token-crypto.ts) — OAuth 1.0a needs both the
-  // token and its secret to make authenticated calls, unlike OAuth 2.0's
-  // single bearer token.
-  accessToken       String
-  accessTokenSecret String
-  externalUserId    String
-  externalUsername  String
+  id               String   @id @default(cuid())
+  accountId        String
+  account          Account  @relation(fields: [accountId], references: [id])
+  platform         String   // X only for now — direct OAuth, not Buffer
+  // Encrypted (lib/security/token-crypto.ts). OAuth 2.0 Authorization Code
+  // + PKCE — access tokens expire (tokenExpiresAt); refreshToken (granted
+  // by the offline.access scope) is how a future publish step renews one
+  // without asking the user to reconnect.
+  accessToken      String
+  refreshToken     String
+  tokenExpiresAt   DateTime
+  externalUserId   String
+  externalUsername String
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@unique([accountId, platform])
 }

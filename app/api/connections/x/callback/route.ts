@@ -7,16 +7,17 @@ const PENDING_COOKIE = "x_oauth_pending";
 
 interface PendingHandshake {
   accountId: string;
-  oauth_token: string;
-  oauth_token_secret: string;
+  state: string;
+  codeVerifier: string;
+  callbackUrl: string;
 }
 
 export async function GET(request: NextRequest) {
-  const oauthToken = request.nextUrl.searchParams.get("oauth_token");
-  const oauthVerifier = request.nextUrl.searchParams.get("oauth_verifier");
+  const code = request.nextUrl.searchParams.get("code");
+  const state = request.nextUrl.searchParams.get("state");
   const pendingCookie = request.cookies.get(PENDING_COOKIE)?.value;
 
-  if (!oauthToken || !oauthVerifier || !pendingCookie) {
+  if (!code || !state || !pendingCookie) {
     return NextResponse.redirect(new URL("/settings?x_error=missing_params", request.url));
   }
 
@@ -27,44 +28,47 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/settings?x_error=expired", request.url));
   }
 
-  // The token in the callback URL must match the one we issued — otherwise
-  // this isn't the handshake we started.
-  if (pending.oauth_token !== oauthToken) {
+  // The state returned by X must match the one we issued — otherwise this
+  // isn't the handshake we started (CSRF guard).
+  if (pending.state !== state) {
     return NextResponse.redirect(new URL("/settings?x_error=token_mismatch", request.url));
   }
 
-  const appKey = process.env.X_API_KEY;
-  const appSecret = process.env.X_API_SECRET;
-  if (!appKey || !appSecret) {
+  const clientId = process.env.X_CLIENT_ID;
+  const clientSecret = process.env.X_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
     return NextResponse.redirect(new URL("/settings?x_error=not_configured", request.url));
   }
 
   try {
-    const requestClient = new TwitterApi({
-      appKey,
-      appSecret,
-      accessToken: pending.oauth_token,
-      accessSecret: pending.oauth_token_secret,
-    });
-    const { client: loggedClient, accessToken, accessSecret } = await requestClient.login(oauthVerifier);
+    const client = new TwitterApi({ clientId, clientSecret });
+    const {
+      client: loggedClient,
+      accessToken,
+      refreshToken,
+      expiresIn,
+    } = await client.loginWithOAuth2({ code, codeVerifier: pending.codeVerifier, redirectUri: pending.callbackUrl });
+
+    if (!refreshToken) {
+      // Shouldn't happen given offline.access was requested, but a token we
+      // can't ever refresh isn't safe to treat as a working connection.
+      throw new Error("No refresh token returned — offline.access scope may not have been granted");
+    }
+
     const me = await loggedClient.v2.me();
+
+    const data = {
+      accessToken: encryptToken(accessToken),
+      refreshToken: encryptToken(refreshToken),
+      tokenExpiresAt: new Date(Date.now() + expiresIn * 1000),
+      externalUserId: me.data.id,
+      externalUsername: me.data.username,
+    };
 
     await prisma.accountSocialToken.upsert({
       where: { accountId_platform: { accountId: pending.accountId, platform: "X" } },
-      update: {
-        accessToken: encryptToken(accessToken),
-        accessTokenSecret: encryptToken(accessSecret),
-        externalUserId: me.data.id,
-        externalUsername: me.data.username,
-      },
-      create: {
-        accountId: pending.accountId,
-        platform: "X",
-        accessToken: encryptToken(accessToken),
-        accessTokenSecret: encryptToken(accessSecret),
-        externalUserId: me.data.id,
-        externalUsername: me.data.username,
-      },
+      update: data,
+      create: { accountId: pending.accountId, platform: "X", ...data },
     });
 
     const response = NextResponse.redirect(new URL("/settings?x_connected=1", request.url));
