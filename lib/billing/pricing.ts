@@ -1,16 +1,34 @@
-// International (USD) pricing via Razorpay. Requires Razorpay's
-// International Payments feature enabled on the account (KYC/business
-// verification on the Razorpay dashboard) — order creation works without it,
-// but real customer checkout does not. See lib/billing/razorpay.ts.
+import type { BillingCurrency } from "./geo";
+
 export const PLAN_TIERS = ["STARTER", "GROWTH", "AGENCY"] as const;
 export type PlanTier = (typeof PLAN_TIERS)[number];
 
-const CURRENCY = "USD";
+interface TierPricing {
+  amountMinorUnits: number;
+  currency: string;
+  label: string;
+}
 
-export const PLAN_PRICING: Record<PlanTier, { amountMinorUnits: number; currency: string; label: string }> = {
-  STARTER: { amountMinorUnits: 4_990, currency: CURRENCY, label: "$49.90/month" },
-  GROWTH: { amountMinorUnits: 9_990, currency: CURRENCY, label: "$99.90/month" },
-  AGENCY: { amountMinorUnits: 15_990, currency: CURRENCY, label: "$159.90/month" },
+// USD tiers — international track, confirmed pricing.
+const USD_PRICING: Record<PlanTier, TierPricing> = {
+  STARTER: { amountMinorUnits: 4_990, currency: "USD", label: "$49.90/month" },
+  GROWTH: { amountMinorUnits: 9_990, currency: "USD", label: "$99.90/month" },
+  AGENCY: { amountMinorUnits: 15_990, currency: "USD", label: "$159.90/month" },
+};
+
+// PLACEHOLDER — INR tiers for the domestic track. NOT confirmed real
+// pricing (carried over from an earlier guess purely so this track has
+// something non-zero to test end-to-end against). Replace with real
+// amounts before any Indian visitor can actually reach checkout.
+const INR_PRICING: Record<PlanTier, TierPricing> = {
+  STARTER: { amountMinorUnits: 99_900, currency: "INR", label: "₹999/month" },
+  GROWTH: { amountMinorUnits: 299_900, currency: "INR", label: "₹2,999/month" },
+  AGENCY: { amountMinorUnits: 799_900, currency: "INR", label: "₹7,999/month" },
+};
+
+export const PLAN_PRICING: Record<BillingCurrency, Record<PlanTier, TierPricing>> = {
+  USD: USD_PRICING,
+  INR: INR_PRICING,
 };
 
 export function isPlanTier(value: unknown): value is PlanTier {

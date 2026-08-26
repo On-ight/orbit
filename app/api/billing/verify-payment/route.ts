@@ -64,6 +64,9 @@ export async function POST(request: NextRequest) {
     data: {
       subscriptionStatus: "active",
       planTier: notes.planTier,
+      // order.currency comes back from Razorpay's own record, not the
+      // client — same trust boundary as notes.planTier above.
+      billingCurrency: order.currency,
       razorpayOrderId: razorpay_order_id,
       razorpayPaymentId: razorpay_payment_id,
     },

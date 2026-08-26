@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getRazorpayClient } from "@/lib/billing/razorpay";
 import { PLAN_PRICING, isPlanTier } from "@/lib/billing/pricing";
+import { resolveBillingCurrency } from "@/lib/billing/geo";
 
 const MIN_AMOUNT_MINOR_UNITS = 100;
 
@@ -17,7 +18,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
   }
 
-  const { amountMinorUnits: amount, currency } = PLAN_PRICING[planTier];
+  // Server-resolved from the request's own geo header, not client input —
+  // the visitor doesn't get to pick their currency, their location does.
+  const billingCurrency = resolveBillingCurrency(request.headers, request.nextUrl.searchParams.get("country"));
+  const { amountMinorUnits: amount, currency } = PLAN_PRICING[billingCurrency][planTier];
   if (amount < MIN_AMOUNT_MINOR_UNITS) {
     return NextResponse.json({ error: "Amount is below Razorpay's minimum" }, { status: 400 });
   }

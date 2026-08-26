@@ -1,7 +1,9 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { PLAN_PRICING, type PlanTier } from "@/lib/billing/pricing";
+import { resolveBillingCurrency } from "@/lib/billing/geo";
 import { SubscribeButton } from "@/components/billing/SubscribeButton";
 
 export const metadata: Metadata = {
@@ -47,7 +49,9 @@ const TIERS: { tier: PlanTier; name: string; audience: string; features: string[
 ];
 
 export default async function PricingPage() {
-  const currentUser = await getCurrentUser();
+  const [currentUser, headerList] = await Promise.all([getCurrentUser(), headers()]);
+  const billingCurrency = resolveBillingCurrency(headerList);
+  const pricingForCurrency = PLAN_PRICING[billingCurrency];
 
   return (
     <>
@@ -69,7 +73,7 @@ export default async function PricingPage() {
               <div key={tier.name} className="rounded-xl border border-neutral-200 bg-white p-6">
                 <p className="text-lg font-semibold">{tier.name}</p>
                 <p className="mt-1 text-sm text-neutral-500">{tier.audience}</p>
-                <p className="mt-4 text-2xl font-semibold">{PLAN_PRICING[tier.tier].label}</p>
+                <p className="mt-4 text-2xl font-semibold">{pricingForCurrency[tier.tier].label}</p>
                 <ul className="mt-6 space-y-3">
                   {tier.features.map((feature) => (
                     <li key={feature} className="flex items-start gap-2 text-sm text-neutral-600">

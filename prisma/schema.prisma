@@ -22,6 +22,9 @@ model Account {
   stripeSubscriptionId String?
   // Razorpay Standard Checkout — set once the most recent payment's
   // signature has been verified server-side (never on the client's say-so).
+  // billingCurrency comes from Razorpay's own order record at verify time
+  // (USD = international track, INR = domestic), not a client-supplied value.
+  billingCurrency      String?
   razorpayOrderId      String?
   razorpayPaymentId    String?
 
