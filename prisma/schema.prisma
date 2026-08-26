@@ -33,6 +33,7 @@ model Account {
 
   users                User[]
   bufferChannels       AccountBufferChannel[]
+  socialTokens         AccountSocialToken[]
   mockMentions         MockMention[]
   conversations        Conversation[]
   posts                Post[]
@@ -70,6 +71,25 @@ model AccountBufferChannel {
   bufferChannelId String
 
   createdAt       DateTime @default(now())
+
+  @@unique([accountId, platform])
+}
+
+model AccountSocialToken {
+  id                String   @id @default(cuid())
+  accountId         String
+  account           Account  @relation(fields: [accountId], references: [id])
+  platform          String   // X only for now — direct OAuth, not Buffer
+  // Encrypted (lib/security/token-crypto.ts) — OAuth 1.0a needs both the
+  // token and its secret to make authenticated calls, unlike OAuth 2.0's
+  // single bearer token.
+  accessToken       String
+  accessTokenSecret String
+  externalUserId    String
+  externalUsername  String
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   @@unique([accountId, platform])
 }

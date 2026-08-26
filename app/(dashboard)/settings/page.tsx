@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/db/prisma";
 import { RunCycleButton } from "@/components/settings/RunCycleButton";
 import { KnowledgeBaseManager } from "@/components/settings/KnowledgeBaseManager";
-import { isBufferConfigured, isBufferConfiguredForPlatform } from "@/lib/publishing/buffer-client";
+import { ConnectionsPanel } from "@/components/settings/ConnectionsPanel";
+import { isBufferConfiguredForPlatform } from "@/lib/publishing/buffer-client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { PLATFORMS } from "@/lib/types";
 
@@ -42,69 +43,70 @@ const TIER_GROUPS: { tier: string; label: string; color: string; actions: string
   },
 ];
 
-const PLATFORM_LABEL: Record<string, string> = { X: "X (Twitter)", THREADS: "Threads", LINKEDIN: "LinkedIn" };
+function xErrorMessage(code: string): string {
+  if (code === "not_configured") return "X isn't configured yet — contact support.";
+  if (code === "missing_params" || code === "expired") return "That connection link expired — try again.";
+  if (code === "token_mismatch") return "Something didn't match up — try connecting again.";
+  return "Couldn't connect X — try again, or contact support if it keeps happening.";
+}
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const currentUser = await requireCurrentUser();
   const { accountId } = currentUser;
+  const params = await searchParams;
 
-  const [runs, hasApiKey, bufferConfigured, platformConnections, knowledgeBaseEntries] = await Promise.all([
+  const [runs, hasApiKey, platformConnections, knowledgeBaseEntries, xToken] = await Promise.all([
     prisma.agentRun.findMany({ where: { accountId }, orderBy: { startedAt: "desc" }, take: 10 }),
     Promise.resolve(Boolean(process.env.ANTHROPIC_API_KEY)),
-    isBufferConfigured(accountId),
     Promise.all(PLATFORMS.map(async (p) => [p, await isBufferConfiguredForPlatform(accountId, p)] as const)),
     prisma.knowledgeBaseEntry.findMany({ where: { accountId }, orderBy: { createdAt: "asc" } }),
+    prisma.accountSocialToken.findUnique({ where: { accountId_platform: { accountId, platform: "X" } } }),
   ]);
 
   const connectedByPlatform = Object.fromEntries(platformConnections);
+
+  let notice: { kind: "success" | "error"; message: string } | null = null;
+  if (params.x_connected) {
+    notice = { kind: "success", message: `Connected as @${xToken?.externalUsername ?? "your account"}.` };
+  } else if (params.x_disconnected) {
+    notice = { kind: "success", message: "X disconnected." };
+  } else if (typeof params.x_error === "string") {
+    notice = { kind: "error", message: xErrorMessage(params.x_error) };
+  }
 
   return (
     <div>
       <h1 className="text-2xl font-semibold text-[var(--text-primary)]">Settings</h1>
 
+      <div className="mt-6">
+        <ConnectionsPanel
+          x={{ connected: Boolean(xToken), username: xToken?.externalUsername }}
+          threads={{ connected: connectedByPlatform.THREADS }}
+          linkedin={{ connected: connectedByPlatform.LINKEDIN }}
+          notice={notice}
+        />
+      </div>
+
       <section className="mt-6 rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-5">
-        <h2 className="mb-3 text-sm font-semibold text-[var(--text-primary)]">Connections</h2>
-        <div className="space-y-2 text-xs">
-          <p>
-            Claude API key:{" "}
-            <span
-              className="font-medium"
-              style={{ color: hasApiKey ? "var(--status-good)" : "var(--status-critical)" }}
-            >
-              {hasApiKey ? "configured" : "missing — contact support"}
-            </span>
+        <p className="text-xs">
+          Claude API key:{" "}
+          <span
+            className="font-medium"
+            style={{ color: hasApiKey ? "var(--status-good)" : "var(--status-critical)" }}
+          >
+            {hasApiKey ? "configured" : "missing — contact support"}
+          </span>
+        </p>
+        {(!connectedByPlatform.THREADS || !connectedByPlatform.LINKEDIN) && (
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            Threads/LinkedIn via Buffer are set up by hand shortly after you connect there — reach
+            out if it&apos;s been more than a day or two.
           </p>
-          <div>
-            <p className="mb-1">
-              Publishing:{" "}
-              <span
-                className="font-medium"
-                style={{ color: bufferConfigured ? "var(--status-good)" : "var(--status-warning)" }}
-              >
-                {bufferConfigured ? "connected" : "setting up"}
-              </span>
-            </p>
-            <ul className="ml-4 list-disc space-y-0.5 text-[var(--text-secondary)]">
-              {PLATFORMS.map((p) => {
-                const connected = connectedByPlatform[p];
-                return (
-                  <li key={p}>
-                    {PLATFORM_LABEL[p]}:{" "}
-                    <span style={{ color: connected ? "var(--status-good)" : "var(--text-muted)" }}>
-                      {connected ? "connected" : "not connected yet"}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-            {!bufferConfigured && (
-              <p className="mt-1 text-[var(--text-muted)]">
-                We&apos;re setting up your connected accounts — this happens by hand shortly after
-                you subscribe. Reach out if it&apos;s been more than a day or two.
-              </p>
-            )}
-          </div>
-        </div>
+        )}
       </section>
 
       <section className="mt-6 rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-5">
