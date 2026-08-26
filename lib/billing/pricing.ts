@@ -1,14 +1,16 @@
-// PLACEHOLDER PRICING — these amounts have not been confirmed as real prices
-// anywhere in this project. They exist so the Razorpay integration has real
-// numbers to run against in test mode. Update before accepting a live
-// payment with live (non rzp_test_) keys.
+// International (USD) pricing via Razorpay. Requires Razorpay's
+// International Payments feature enabled on the account (KYC/business
+// verification on the Razorpay dashboard) — order creation works without it,
+// but real customer checkout does not. See lib/billing/razorpay.ts.
 export const PLAN_TIERS = ["STARTER", "GROWTH", "AGENCY"] as const;
 export type PlanTier = (typeof PLAN_TIERS)[number];
 
-export const PLAN_PRICING: Record<PlanTier, { amountPaise: number; label: string }> = {
-  STARTER: { amountPaise: 99_900, label: "₹999/month" },
-  GROWTH: { amountPaise: 299_900, label: "₹2,999/month" },
-  AGENCY: { amountPaise: 799_900, label: "₹7,999/month" },
+const CURRENCY = "USD";
+
+export const PLAN_PRICING: Record<PlanTier, { amountMinorUnits: number; currency: string; label: string }> = {
+  STARTER: { amountMinorUnits: 4_990, currency: CURRENCY, label: "$49.90/month" },
+  GROWTH: { amountMinorUnits: 9_990, currency: CURRENCY, label: "$99.90/month" },
+  AGENCY: { amountMinorUnits: 15_990, currency: CURRENCY, label: "$159.90/month" },
 };
 
 export function isPlanTier(value: unknown): value is PlanTier {

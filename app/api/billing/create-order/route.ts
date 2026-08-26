@@ -3,7 +3,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { getRazorpayClient } from "@/lib/billing/razorpay";
 import { PLAN_PRICING, isPlanTier } from "@/lib/billing/pricing";
 
-const MIN_AMOUNT_PAISE = 100;
+const MIN_AMOUNT_MINOR_UNITS = 100;
 
 export async function POST(request: NextRequest) {
   const currentUser = await getCurrentUser();
@@ -17,8 +17,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
   }
 
-  const amount = PLAN_PRICING[planTier].amountPaise;
-  if (amount < MIN_AMOUNT_PAISE) {
+  const { amountMinorUnits: amount, currency } = PLAN_PRICING[planTier];
+  if (amount < MIN_AMOUNT_MINOR_UNITS) {
     return NextResponse.json({ error: "Amount is below Razorpay's minimum" }, { status: 400 });
   }
 
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     const razorpay = getRazorpayClient();
     const order = await razorpay.orders.create({
       amount,
-      currency: "INR",
+      currency,
       receipt: `ord_${Date.now()}`,
       // The plan being paid for lives here, not in the client's verify
       // request — verify-payment re-fetches the order from Razorpay to read
