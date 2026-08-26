@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomBytes, createHash } from "crypto";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { encryptToken } from "@/lib/security/token-crypto";
+import { SITE_URL } from "@/lib/site-url";
 
 const PENDING_COOKIE = "x_oauth_pending";
 const SCOPE = "tweet.read tweet.write users.read offline.access";
@@ -35,7 +36,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/settings?x_error=not_configured", request.url));
   }
 
-  const callbackUrl = new URL("/api/connections/x/callback", request.url).toString();
+  // Fixed to the canonical site origin, not request.url — the visitor may
+  // have reached this route via any valid host for the deployment (www vs
+  // apex, a Vercel preview domain), but X only accepts the exact
+  // redirect_uri registered for this app.
+  const callbackUrl = new URL("/api/connections/x/callback", SITE_URL).toString();
   const { codeVerifier, codeChallenge } = generatePkcePair();
   const state = base64url(randomBytes(24));
 
