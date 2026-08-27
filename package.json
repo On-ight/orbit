@@ -15,6 +15,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",
     "@prisma/client": "^5.22.0",
+    "@vercel/analytics": "^2.0.1",
     "@vercel/blob": "^2.8.0",
     "firebase": "^12.18.0",
     "firebase-admin": "^14.3.0",
