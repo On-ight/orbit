@@ -7,7 +7,7 @@ import { COOKIE_NAME } from "@/lib/auth/cookie";
 // added later would silently 404-redirect for crawlers/visitors until
 // someone remembered to list it here; a blocklist means new marketing pages
 // just work.
-const PROTECTED_PAGE_PREFIXES = ["/dashboard", "/approvals", "/content", "/conversations", "/settings"];
+const PROTECTED_PAGE_PREFIXES = ["/dashboard", "/approvals", "/content", "/conversations", "/settings", "/onboarding"];
 // API routes default to protected (the safer default for API surface) except
 // these explicit exceptions, which carry no session cookie by design.
 const PUBLIC_API_PREFIXES = ["/api/auth/session", "/api/cron", "/api/webhooks"];

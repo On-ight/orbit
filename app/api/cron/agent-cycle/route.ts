@@ -28,8 +28,10 @@ export async function GET(request: NextRequest) {
     ? (slotParam as string)
     : "06:00";
 
+  // MANUAL accounts never run on cron, only via the "Run agent cycle"
+  // button — cron is exclusively for accounts that opted into AUTOMATIC.
   const activeAccounts = await prisma.account.findMany({
-    where: { subscriptionStatus: "active", agentCycleTimeSlot: slot },
+    where: { subscriptionStatus: "active", cycleMode: "AUTOMATIC", agentCycleTimeSlot: slot },
     select: { id: true, name: true },
   });
 

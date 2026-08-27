@@ -36,6 +36,15 @@ model Account {
   // since Vercel's cron only fires at fixed schedules, not per-account ones.
   autoApproveMode      Boolean   @default(false)
   agentCycleTimeSlot   String    @default("06:00")
+  // MANUAL: only the "Run agent cycle" button triggers a cycle, cron skips
+  // this account entirely. AUTOMATIC: cron runs it daily at
+  // agentCycleTimeSlot instead, and the manual button is hidden.
+  cycleMode            String    @default("MANUAL")
+  // Set once the post-signup onboarding sequence (knowledge base ->
+  // automation preference) has been completed — distinguishes "chose
+  // MANUAL deliberately" from "never went through onboarding yet", since
+  // MANUAL is itself a valid completed choice, not just an unset default.
+  onboardingCompletedAt DateTime?
 
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt

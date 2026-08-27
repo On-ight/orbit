@@ -29,6 +29,20 @@ export async function runAgentCycle(
     data: { accountId, triggeredBy, status: "RUNNING" },
   });
 
+  // Without a knowledge base, buildSystemPrompt() falls back to the bare
+  // safety prompt with no brand voice at all — every draft would read
+  // generic. Refuse the whole cycle rather than let that happen silently,
+  // regardless of how this got triggered.
+  const kbCount = await prisma.knowledgeBaseEntry.count({ where: { accountId } });
+  if (kbCount === 0) {
+    const summary = "Skipped — no knowledge base entries yet. Add at least one in Settings first.";
+    await prisma.agentRun.update({
+      where: { id: run.id },
+      data: { status: "FAILED", summary, completedAt: new Date() },
+    });
+    return { agentRunId: run.id, status: "FAILED", summary };
+  }
+
   const parts: string[] = [];
   let hadError = false;
 

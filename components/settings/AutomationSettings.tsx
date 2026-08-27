@@ -22,24 +22,42 @@ async function patchSettings(body: Record<string, unknown>) {
 export function AutomationSettings({
   autoApproveMode: initialAutoApproveMode,
   agentCycleTimeSlot: initialTimeSlot,
+  cycleMode: initialCycleMode,
 }: {
   autoApproveMode: boolean;
   agentCycleTimeSlot: string;
+  cycleMode: string;
 }) {
   const [autoApproveMode, setAutoApproveMode] = useState(initialAutoApproveMode);
   const [timeSlot, setTimeSlot] = useState(initialTimeSlot);
-  const [saving, setSaving] = useState<"mode" | "slot" | null>(null);
+  const [cycleMode, setCycleMode] = useState(initialCycleMode);
+  const [saving, setSaving] = useState<"approval" | "cycle" | "slot" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleToggle(next: boolean) {
+  async function handleApprovalToggle(next: boolean) {
     const previous = autoApproveMode;
     setAutoApproveMode(next);
-    setSaving("mode");
+    setSaving("approval");
     setError(null);
     try {
       await patchSettings({ autoApproveMode: next });
     } catch (err) {
       setAutoApproveMode(previous);
+      setError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function handleCycleModeChange(next: "MANUAL" | "AUTOMATIC") {
+    const previous = cycleMode;
+    setCycleMode(next);
+    setSaving("cycle");
+    setError(null);
+    try {
+      await patchSettings({ cycleMode: next });
+    } catch (err) {
+      setCycleMode(previous);
       setError(err instanceof Error ? err.message : "Failed to save");
     } finally {
       setSaving(null);
@@ -64,6 +82,63 @@ export function AutomationSettings({
   return (
     <div className="space-y-6">
       <div>
+        <p className="text-sm font-medium text-[var(--text-primary)]">How the cycle runs</p>
+        <p className="mt-1 text-xs text-[var(--text-muted)]">
+          Manual means only the &quot;Run agent cycle&quot; button (below) triggers a cycle.
+          Automatic runs it daily on its own, at a time you choose.
+        </p>
+        <div className="mt-3 flex overflow-hidden rounded-lg border border-[var(--border)] text-sm font-medium">
+          <button
+            type="button"
+            onClick={() => handleCycleModeChange("MANUAL")}
+            disabled={saving === "cycle"}
+            className="flex-1 px-4 py-2 transition disabled:cursor-not-allowed"
+            style={
+              cycleMode === "MANUAL"
+                ? { background: "var(--accent)", color: "#fff" }
+                : { background: "var(--surface-1)", color: "var(--text-secondary)" }
+            }
+          >
+            Manual
+          </button>
+          <button
+            type="button"
+            onClick={() => handleCycleModeChange("AUTOMATIC")}
+            disabled={saving === "cycle"}
+            className="flex-1 px-4 py-2 transition disabled:cursor-not-allowed"
+            style={
+              cycleMode === "AUTOMATIC"
+                ? { background: "var(--accent)", color: "#fff" }
+                : { background: "var(--surface-1)", color: "var(--text-secondary)" }
+            }
+          >
+            Automatic
+          </button>
+        </div>
+
+        {cycleMode === "AUTOMATIC" && (
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {AGENT_CYCLE_TIME_SLOTS.map((slot) => (
+              <button
+                key={slot}
+                type="button"
+                onClick={() => handleSlotChange(slot)}
+                disabled={saving === "slot"}
+                className="rounded-lg border px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed"
+                style={
+                  timeSlot === slot
+                    ? { background: "var(--accent-soft)", borderColor: "var(--accent)", color: "var(--accent)" }
+                    : { background: "var(--surface-1)", borderColor: "var(--border)", color: "var(--text-secondary)" }
+                }
+              >
+                {SLOT_LABELS[slot as AgentCycleTimeSlot]}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div>
         <p className="text-sm font-medium text-[var(--text-primary)]">Approval mode</p>
         <p className="mt-1 text-xs text-[var(--text-muted)]">
           Applies only to 🟢 Auto-tier replies. 🔴 Never-tier items always require a human, no
@@ -72,8 +147,8 @@ export function AutomationSettings({
         <div className="mt-3 flex overflow-hidden rounded-lg border border-[var(--border)] text-sm font-medium">
           <button
             type="button"
-            onClick={() => handleToggle(false)}
-            disabled={saving === "mode"}
+            onClick={() => handleApprovalToggle(false)}
+            disabled={saving === "approval"}
             className="flex-1 px-4 py-2 transition disabled:cursor-not-allowed"
             style={
               !autoApproveMode
@@ -85,8 +160,8 @@ export function AutomationSettings({
           </button>
           <button
             type="button"
-            onClick={() => handleToggle(true)}
-            disabled={saving === "mode"}
+            onClick={() => handleApprovalToggle(true)}
+            disabled={saving === "approval"}
             className="flex-1 px-4 py-2 transition disabled:cursor-not-allowed"
             style={
               autoApproveMode
@@ -96,31 +171,6 @@ export function AutomationSettings({
           >
             Auto-approve 🟢 Auto items
           </button>
-        </div>
-      </div>
-
-      <div>
-        <p className="text-sm font-medium text-[var(--text-primary)]">Daily run time</p>
-        <p className="mt-1 text-xs text-[var(--text-muted)]">
-          When the agent cycle researches, drafts, and (if auto-approve is on) publishes each day.
-        </p>
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {AGENT_CYCLE_TIME_SLOTS.map((slot) => (
-            <button
-              key={slot}
-              type="button"
-              onClick={() => handleSlotChange(slot)}
-              disabled={saving === "slot"}
-              className="rounded-lg border px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed"
-              style={
-                timeSlot === slot
-                  ? { background: "var(--accent-soft)", borderColor: "var(--accent)", color: "var(--accent)" }
-                  : { background: "var(--surface-1)", borderColor: "var(--border)", color: "var(--text-secondary)" }
-              }
-            >
-              {SLOT_LABELS[slot as AgentCycleTimeSlot]}
-            </button>
-          ))}
         </div>
       </div>
 

@@ -15,6 +15,8 @@ export interface CurrentUser {
     subscriptionStatus: string;
     autoApproveMode: boolean;
     agentCycleTimeSlot: string;
+    cycleMode: string;
+    onboardingCompletedAt: Date | null;
   };
 }
 
@@ -49,6 +51,8 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
       subscriptionStatus: user.account.subscriptionStatus,
       autoApproveMode: user.account.autoApproveMode,
       agentCycleTimeSlot: user.account.agentCycleTimeSlot,
+      cycleMode: user.account.cycleMode,
+      onboardingCompletedAt: user.account.onboardingCompletedAt,
     },
   };
 }

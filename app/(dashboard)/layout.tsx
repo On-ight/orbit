@@ -1,13 +1,21 @@
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/nav/Sidebar";
 import { requireCurrentUser } from "@/lib/auth/current-user";
+import { prisma } from "@/lib/db/prisma";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const currentUser = await requireCurrentUser();
 
-  // Every dashboard page needs an active subscription — /pricing lives
-  // outside this layout group specifically so this redirect can't loop.
+  // Onboarding sequence (knowledge base -> automation preference -> pricing)
+  // only applies pre-subscription — an already-active account never gets
+  // routed back into it, even if it later ends up with zero knowledge base
+  // entries (runAgentCycle's own guard handles that case instead, since
+  // bouncing a paying customer entirely out of their dashboard over it
+  // would be a much heavier consequence than the onboarding gate intends).
   if (currentUser.account.subscriptionStatus !== "active") {
+    const kbCount = await prisma.knowledgeBaseEntry.count({ where: { accountId: currentUser.accountId } });
+    if (kbCount === 0) redirect("/onboarding/knowledge-base");
+    if (!currentUser.account.onboardingCompletedAt) redirect("/onboarding/automation");
     redirect("/pricing");
   }
 

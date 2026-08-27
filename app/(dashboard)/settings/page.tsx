@@ -106,26 +106,40 @@ export default async function SettingsPage({
         <AutomationSettings
           autoApproveMode={currentUser.account.autoApproveMode}
           agentCycleTimeSlot={currentUser.account.agentCycleTimeSlot}
+          cycleMode={currentUser.account.cycleMode}
         />
       </section>
 
-      <section className="mt-6 rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-5">
-        <h2 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Run agent cycle</h2>
-        <p className="mb-4 text-xs text-[var(--text-muted)]">
-          Runs automatically every day at{" "}
-          <span className="font-medium text-[var(--text-secondary)]">
-            {SLOT_LABELS[currentUser.account.agentCycleTimeSlot] ?? currentUser.account.agentCycleTimeSlot}
-          </span>{" "}
-          (look for <span className="font-medium text-[var(--text-secondary)]">CRON</span>-triggered
-          runs below — change the time above). You can also trigger one manually any time — the
-          Trend, Content, and Community agents will process whatever&apos;s new, including fresh
-          live-web-search trend research.
-        </p>
-        <RunCycleButton />
-      </section>
+      {currentUser.account.cycleMode === "MANUAL" && (
+        <section className="mt-6 rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-5">
+          <h2 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Run agent cycle</h2>
+          <p className="mb-4 text-xs text-[var(--text-muted)]">
+            You&apos;re on manual — nothing runs on a schedule. Trigger a cycle any time and the
+            Trend, Content, and Community agents will process whatever&apos;s new, including fresh
+            live-web-search trend research. Switch to Automatic above to run this on its own instead.
+          </p>
+          {knowledgeBaseEntries.length === 0 ? (
+            <p className="text-xs text-[var(--status-critical)]">
+              Add at least one knowledge base entry below before running a cycle — without one,
+              there&apos;s no brand voice to draft from.
+            </p>
+          ) : (
+            <RunCycleButton />
+          )}
+        </section>
+      )}
 
       <section className="mt-6 rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-5">
-        <h2 className="mb-3 text-sm font-semibold text-[var(--text-primary)]">Recent runs</h2>
+        <h2 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Recent runs</h2>
+        {currentUser.account.cycleMode === "AUTOMATIC" && (
+          <p className="mb-3 text-xs text-[var(--text-muted)]">
+            Runs automatically every day around{" "}
+            <span className="font-medium text-[var(--text-secondary)]">
+              {SLOT_LABELS[currentUser.account.agentCycleTimeSlot] ?? currentUser.account.agentCycleTimeSlot}
+            </span>
+            .
+          </p>
+        )}
         {runs.length === 0 ? (
           <p className="text-sm text-[var(--text-muted)]">No runs yet.</p>
         ) : (
