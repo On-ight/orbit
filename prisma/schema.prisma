@@ -28,6 +28,15 @@ model Account {
   razorpayOrderId      String?
   razorpayPaymentId    String?
 
+  // Automation preferences. autoApproveMode only ever affects 🟢 Auto-tier
+  // replies — 🔴 Never-tier items are never touched by this regardless, and
+  // posts are always approval-gated by policy (see content-agent.ts).
+  // agentCycleTimeSlot picks which of a handful of fixed daily cron slots
+  // (see vercel.json) this account's cycle runs in — not an arbitrary time,
+  // since Vercel's cron only fires at fixed schedules, not per-account ones.
+  autoApproveMode      Boolean   @default(false)
+  agentCycleTimeSlot   String    @default("06:00")
+
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 

@@ -13,6 +13,8 @@ export interface CurrentUser {
     name: string;
     planTier: string | null;
     subscriptionStatus: string;
+    autoApproveMode: boolean;
+    agentCycleTimeSlot: string;
   };
 }
 
@@ -45,6 +47,8 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
       name: user.account.name,
       planTier: user.account.planTier,
       subscriptionStatus: user.account.subscriptionStatus,
+      autoApproveMode: user.account.autoApproveMode,
+      agentCycleTimeSlot: user.account.agentCycleTimeSlot,
     },
   };
 }

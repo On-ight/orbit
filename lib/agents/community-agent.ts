@@ -2,6 +2,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { callStructuredClaude, buildSystemPrompt, ClaudeRefusalError } from "@/lib/agents/claude-client";
 import { resolveRiskTier } from "@/lib/agents/risk-tiers";
+import { autoPublishApproval } from "@/lib/publishing/auto-publish";
 import { INTENT_LEVELS, RISK_TIERS } from "@/lib/types";
 
 const analysisSchema = z.object({
@@ -131,7 +132,7 @@ leave margin rather than write right up to the edge.`,
   });
 
   if (!isNever && analysis.draftReply) {
-    await prisma.approval.create({
+    const approval = await prisma.approval.create({
       data: {
         accountId,
         type: "REPLY",
@@ -143,6 +144,16 @@ leave margin rather than write right up to the edge.`,
         conversationId: conversation.id,
       },
     });
+
+    if (tier === "AUTO") {
+      const account = await prisma.account.findUnique({
+        where: { id: accountId },
+        select: { autoApproveMode: true },
+      });
+      if (account?.autoApproveMode) {
+        await autoPublishApproval(approval.id);
+      }
+    }
   }
 
   return { mentionId, ok: true };

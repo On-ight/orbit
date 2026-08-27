@@ -27,3 +27,11 @@ export const PLATFORM_CHAR_LIMITS: Record<Platform, number> = {
   THREADS: 500,
   LINKEDIN: 3000,
 };
+
+// Fixed daily cron slots (IST) — not an arbitrary time picker. Vercel Cron
+// fires at fixed schedules, not per-account ones, so each of these
+// corresponds to its own entry in vercel.json; the value here is what's
+// stored on Account.agentCycleTimeSlot and matched against the `slot`
+// query param the matching cron job sends.
+export const AGENT_CYCLE_TIME_SLOTS = ["00:00", "06:00", "12:00", "18:00"] as const;
+export type AgentCycleTimeSlot = (typeof AGENT_CYCLE_TIME_SLOTS)[number];

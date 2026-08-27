@@ -1,24 +1,27 @@
 @import "tailwindcss";
 
 :root {
-  --page-plane: #0d0d0d;
-  --surface-1: #1a1a19;
-  --surface-2: #232322;
-  --text-primary: #ffffff;
-  --text-secondary: #c3c2b7;
-  --text-muted: #898781;
-  --gridline: #2c2c2a;
-  --border: rgba(255, 255, 255, 0.1);
+  /* Light theme, colors drawn from the Orbit logo gradient
+     (#6229CE -> #8E42FC -> #BC69EB) rather than a generic gray/blue palette. */
+  --page-plane: #f7f5fc;
+  --surface-1: #ffffff;
+  --surface-2: #f1ecfa;
+  --text-primary: #1e1b29;
+  --text-secondary: #5b5568;
+  --text-muted: #8b8598;
+  --gridline: #e5e1ef;
+  --border: #e5e1ef;
 
-  --accent: #3987e5;
-  --accent-soft: rgba(57, 135, 229, 0.14);
+  --accent: #8e42fc;
+  --accent-soft: rgba(142, 66, 252, 0.12);
+  --brand-gradient: linear-gradient(120deg, #6229ce, #8e42fc 55%, #bc69eb);
 
-  --status-good: #0ca30c;
-  --status-good-soft: rgba(12, 163, 12, 0.14);
-  --status-warning: #fab219;
-  --status-warning-soft: rgba(250, 178, 25, 0.14);
-  --status-critical: #e66767;
-  --status-critical-soft: rgba(230, 103, 103, 0.14);
+  --status-good: #16a34a;
+  --status-good-soft: rgba(22, 163, 74, 0.12);
+  --status-warning: #d97706;
+  --status-warning-soft: rgba(217, 119, 6, 0.12);
+  --status-critical: #dc2626;
+  --status-critical-soft: rgba(220, 38, 38, 0.12);
 }
 
 @theme inline {

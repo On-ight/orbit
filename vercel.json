@@ -1,8 +1,8 @@
 {
   "crons": [
-    {
-      "path": "/api/cron/agent-cycle",
-      "schedule": "30 0 * * *"
-    }
+    { "path": "/api/cron/agent-cycle?slot=00:00", "schedule": "30 18 * * *" },
+    { "path": "/api/cron/agent-cycle?slot=06:00", "schedule": "30 0 * * *" },
+    { "path": "/api/cron/agent-cycle?slot=12:00", "schedule": "30 6 * * *" },
+    { "path": "/api/cron/agent-cycle?slot=18:00", "schedule": "30 12 * * *" }
   ]
 }

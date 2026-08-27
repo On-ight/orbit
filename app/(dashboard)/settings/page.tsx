@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db/prisma";
 import { RunCycleButton } from "@/components/settings/RunCycleButton";
 import { KnowledgeBaseManager } from "@/components/settings/KnowledgeBaseManager";
 import { ConnectionsPanel } from "@/components/settings/ConnectionsPanel";
+import { AutomationSettings } from "@/components/settings/AutomationSettings";
 import { isBufferConfiguredForPlatform } from "@/lib/publishing/buffer-client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { PLATFORMS } from "@/lib/types";
@@ -43,6 +44,13 @@ const TIER_GROUPS: { tier: string; label: string; color: string; actions: string
   },
 ];
 
+const SLOT_LABELS: Record<string, string> = {
+  "00:00": "12:00 AM IST",
+  "06:00": "6:00 AM IST",
+  "12:00": "12:00 PM IST",
+  "18:00": "6:00 PM IST",
+};
+
 function xErrorMessage(code: string): string {
   if (code === "not_configured") return "X isn't configured yet — contact support.";
   if (code === "missing_params" || code === "expired") return "That connection link expired — try again.";
@@ -59,9 +67,8 @@ export default async function SettingsPage({
   const { accountId } = currentUser;
   const params = await searchParams;
 
-  const [runs, hasApiKey, platformConnections, knowledgeBaseEntries, xToken] = await Promise.all([
+  const [runs, platformConnections, knowledgeBaseEntries, xToken] = await Promise.all([
     prisma.agentRun.findMany({ where: { accountId }, orderBy: { startedAt: "desc" }, take: 10 }),
-    Promise.resolve(Boolean(process.env.ANTHROPIC_API_KEY)),
     Promise.all(PLATFORMS.map(async (p) => [p, await isBufferConfiguredForPlatform(accountId, p)] as const)),
     prisma.knowledgeBaseEntry.findMany({ where: { accountId }, orderBy: { createdAt: "asc" } }),
     prisma.accountSocialToken.findUnique({ where: { accountId_platform: { accountId, platform: "X" } } }),
@@ -92,30 +99,27 @@ export default async function SettingsPage({
       </div>
 
       <section className="mt-6 rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-5">
-        <p className="text-xs">
-          Claude API key:{" "}
-          <span
-            className="font-medium"
-            style={{ color: hasApiKey ? "var(--status-good)" : "var(--status-critical)" }}
-          >
-            {hasApiKey ? "configured" : "missing — contact support"}
-          </span>
+        <h2 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Automation</h2>
+        <p className="mb-4 text-xs text-[var(--text-muted)]">
+          How much Orbit AI does on its own, and when.
         </p>
-        {(!connectedByPlatform.THREADS || !connectedByPlatform.LINKEDIN) && (
-          <p className="mt-1 text-xs text-[var(--text-muted)]">
-            Threads/LinkedIn via Buffer are set up by hand shortly after you connect there — reach
-            out if it&apos;s been more than a day or two.
-          </p>
-        )}
+        <AutomationSettings
+          autoApproveMode={currentUser.account.autoApproveMode}
+          agentCycleTimeSlot={currentUser.account.agentCycleTimeSlot}
+        />
       </section>
 
       <section className="mt-6 rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-5">
         <h2 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Run agent cycle</h2>
         <p className="mb-4 text-xs text-[var(--text-muted)]">
-          Runs automatically every morning at 6am IST via a scheduled job (look for{" "}
-          <span className="font-medium text-[var(--text-secondary)]">CRON</span>-triggered runs
-          below). You can also trigger one manually any time — the Trend, Content, and Community
-          agents will process whatever&apos;s new, including fresh live-web-search trend research.
+          Runs automatically every day at{" "}
+          <span className="font-medium text-[var(--text-secondary)]">
+            {SLOT_LABELS[currentUser.account.agentCycleTimeSlot] ?? currentUser.account.agentCycleTimeSlot}
+          </span>{" "}
+          (look for <span className="font-medium text-[var(--text-secondary)]">CRON</span>-triggered
+          runs below — change the time above). You can also trigger one manually any time — the
+          Trend, Content, and Community agents will process whatever&apos;s new, including fresh
+          live-web-search trend research.
         </p>
         <RunCycleButton />
       </section>
@@ -149,9 +153,11 @@ export default async function SettingsPage({
       </section>
 
       <section className="mt-6 rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-5">
-        <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">
-          Autonomy policy
-        </h2>
+        <h2 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Automation rules</h2>
+        <p className="mb-4 text-xs text-[var(--text-muted)]">
+          What each risk tier actually covers — not configurable, this is the safety policy every
+          account runs under.
+        </p>
         <div className="space-y-4">
           {TIER_GROUPS.map((group) => (
             <div key={group.tier}>

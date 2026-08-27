@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { runAgentCycle } from "@/lib/agents/run-cycle";
+import { AGENT_CYCLE_TIME_SLOTS } from "@/lib/types";
 
 // Web search + multi-platform drafting makes a cycle meaningfully longer
 // than the original X-only version — give it real headroom.
@@ -17,8 +18,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Each fixed vercel.json cron entry hits this route with its own `slot`
+  // — accounts only run in the cycle matching their own chosen time, since
+  // Vercel fires at fixed schedules, not per-account ones. Default to the
+  // original slot so an un-parameterized hit (e.g. a manual test) still
+  // does something reasonable rather than silently matching nothing.
+  const slotParam = request.nextUrl.searchParams.get("slot");
+  const slot = (AGENT_CYCLE_TIME_SLOTS as readonly string[]).includes(slotParam ?? "")
+    ? (slotParam as string)
+    : "06:00";
+
   const activeAccounts = await prisma.account.findMany({
-    where: { subscriptionStatus: "active" },
+    where: { subscriptionStatus: "active", agentCycleTimeSlot: slot },
     select: { id: true, name: true },
   });
 
@@ -35,5 +46,5 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ accountsProcessed: activeAccounts.length, results });
+  return NextResponse.json({ slot, accountsProcessed: activeAccounts.length, results });
 }
