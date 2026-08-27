@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, FormEvent } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createUserWithEmailAndPassword } from "firebase/auth";
@@ -57,17 +58,17 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-neutral-950 px-4">
+    <main className="flex min-h-screen items-center justify-center bg-neutral-50 px-4">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-sm rounded-xl border border-neutral-800 bg-neutral-900 p-8 shadow-xl"
+        className="w-full max-w-sm rounded-2xl border border-neutral-200 bg-white p-8 shadow-sm"
       >
-        <div className="mb-6 text-center">
-          <p className="text-xs font-medium uppercase tracking-widest text-emerald-400">Orbit</p>
-          <h1 className="mt-1 text-xl font-semibold text-neutral-100">Create your account</h1>
+        <div className="mb-6 flex flex-col items-center text-center">
+          <Image src="/orbit-logo.png" alt="Orbit" width={612} height={408} className="h-10 w-auto" />
+          <h1 className="mt-3 text-lg font-semibold text-neutral-900">Create your account</h1>
         </div>
 
-        <label htmlFor="accountName" className="mb-1 block text-sm text-neutral-400">
+        <label htmlFor="accountName" className="mb-1 block text-sm text-neutral-600">
           Brand / company name
         </label>
         <input
@@ -76,10 +77,10 @@ export default function SignupPage() {
           autoFocus
           value={accountName}
           onChange={(e) => setAccountName(e.target.value)}
-          className="mb-4 w-full rounded-md border border-neutral-700 bg-neutral-950 px-3 py-2 text-neutral-100 outline-none focus:border-emerald-500"
+          className="mb-4 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-neutral-900 outline-none transition focus:border-[#8E42FC] focus:ring-1 focus:ring-[#8E42FC]"
         />
 
-        <label htmlFor="email" className="mb-1 block text-sm text-neutral-400">
+        <label htmlFor="email" className="mb-1 block text-sm text-neutral-600">
           Email
         </label>
         <input
@@ -88,10 +89,10 @@ export default function SignupPage() {
           autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="mb-4 w-full rounded-md border border-neutral-700 bg-neutral-950 px-3 py-2 text-neutral-100 outline-none focus:border-emerald-500"
+          className="mb-4 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-neutral-900 outline-none transition focus:border-[#8E42FC] focus:ring-1 focus:ring-[#8E42FC]"
         />
 
-        <label htmlFor="password" className="mb-1 block text-sm text-neutral-400">
+        <label htmlFor="password" className="mb-1 block text-sm text-neutral-600">
           Password
         </label>
         <input
@@ -100,23 +101,24 @@ export default function SignupPage() {
           autoComplete="new-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="mb-1 w-full rounded-md border border-neutral-700 bg-neutral-950 px-3 py-2 text-neutral-100 outline-none focus:border-emerald-500"
+          className="mb-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-neutral-900 outline-none transition focus:border-[#8E42FC] focus:ring-1 focus:ring-[#8E42FC]"
         />
-        <p className="mb-4 text-xs text-neutral-600">At least 6 characters.</p>
+        <p className="mb-4 text-xs text-neutral-500">At least 6 characters.</p>
 
-        {error && <p className="mb-4 text-sm text-red-400">{error}</p>}
+        {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
 
         <button
           type="submit"
           disabled={loading || !accountName || !email || !password}
-          className="w-full rounded-md bg-emerald-500 px-3 py-2 text-sm font-medium text-neutral-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
+          className="w-full rounded-md px-3 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          style={{ background: "linear-gradient(120deg, #6229CE, #8E42FC 55%, #BC69EB)" }}
         >
           {loading ? "Creating account..." : "Create account"}
         </button>
 
         <p className="mt-4 text-center text-sm text-neutral-500">
           Already have an account?{" "}
-          <Link href="/login" className="text-emerald-400 hover:underline">
+          <Link href="/login" className="font-medium text-[#8E42FC] hover:underline">
             Sign in
           </Link>
         </p>
