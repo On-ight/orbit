@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { clientAuth } from "@/lib/firebase/client";
+import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -53,6 +54,14 @@ export default function LoginPage() {
         <div className="mb-6 flex flex-col items-center text-center">
           <Image src="/orbit-logo.png" alt="Orbit" width={612} height={408} className="h-10 w-auto" />
           <h1 className="mt-3 text-lg font-semibold text-neutral-900">Sign in to your workspace</h1>
+        </div>
+
+        <SocialAuthButtons onError={setError} />
+
+        <div className="my-5 flex items-center gap-3">
+          <div className="h-px flex-1 bg-neutral-200" />
+          <p className="text-xs text-neutral-400">or</p>
+          <div className="h-px flex-1 bg-neutral-200" />
         </div>
 
         <label htmlFor="email" className="mb-1 block text-sm text-neutral-600">

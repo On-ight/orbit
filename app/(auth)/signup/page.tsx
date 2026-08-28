@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { clientAuth } from "@/lib/firebase/client";
+import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -79,6 +80,17 @@ export default function SignupPage() {
           onChange={(e) => setAccountName(e.target.value)}
           className="mb-4 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-neutral-900 outline-none transition focus:border-[#8E42FC] focus:ring-1 focus:ring-[#8E42FC]"
         />
+
+        <SocialAuthButtons accountName={accountName.trim()} disabled={!accountName.trim()} onError={setError} />
+        {!accountName.trim() && (
+          <p className="mt-1.5 text-xs text-neutral-400">Enter a brand/company name to enable these.</p>
+        )}
+
+        <div className="my-5 flex items-center gap-3">
+          <div className="h-px flex-1 bg-neutral-200" />
+          <p className="text-xs text-neutral-400">or</p>
+          <div className="h-px flex-1 bg-neutral-200" />
+        </div>
 
         <label htmlFor="email" className="mb-1 block text-sm text-neutral-600">
           Email
