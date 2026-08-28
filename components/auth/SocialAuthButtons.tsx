@@ -42,10 +42,12 @@ function MicrosoftIcon() {
  */
 export function SocialAuthButtons({
   accountName,
+  accountType,
   disabled,
   onError,
 }: {
   accountName?: string;
+  accountType?: string;
   disabled?: boolean;
   onError: (message: string) => void;
 }) {
@@ -64,7 +66,7 @@ export function SocialAuthButtons({
       const res = await fetch("/api/auth/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(accountName ? { idToken, accountName } : { idToken }),
+        body: JSON.stringify(accountName ? { idToken, accountName, accountType } : { idToken }),
       });
 
       if (!res.ok) {

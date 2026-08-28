@@ -16,6 +16,10 @@ datasource db {
 model Account {
   id                   String    @id @default(cuid())
   name                 String
+  // INDIVIDUAL | COMPANY | INFLUENCER | ARTIST | OTHER — collected at
+  // signup. Nullable since accounts created before this field existed have
+  // no value, not because a new signup can skip choosing one.
+  accountType          String?
   planTier             String?   // STARTER | GROWTH | AGENCY | null
   subscriptionStatus   String    @default("incomplete") // incomplete | active | past_due | canceled
   stripeCustomerId     String?

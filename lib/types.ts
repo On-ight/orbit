@@ -35,3 +35,17 @@ export const PLATFORM_CHAR_LIMITS: Record<Platform, number> = {
 // query param the matching cron job sends.
 export const AGENT_CYCLE_TIME_SLOTS = ["00:00", "06:00", "12:00", "18:00"] as const;
 export type AgentCycleTimeSlot = (typeof AGENT_CYCLE_TIME_SLOTS)[number];
+
+// Collected once at signup — only COMPANY changes what the account-name
+// field asks for ("Company name" vs "Your name"), but all five are stored
+// so who's actually signing up isn't just discarded.
+export const ACCOUNT_TYPES = ["INDIVIDUAL", "COMPANY", "INFLUENCER", "ARTIST", "OTHER"] as const;
+export type AccountType = (typeof ACCOUNT_TYPES)[number];
+
+export const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
+  INDIVIDUAL: "Individual",
+  COMPANY: "Company",
+  INFLUENCER: "Influencer",
+  ARTIST: "Artist",
+  OTHER: "Other",
+};

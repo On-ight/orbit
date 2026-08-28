@@ -7,14 +7,19 @@ import { useRouter } from "next/navigation";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { clientAuth } from "@/lib/firebase/client";
 import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons";
+import { ACCOUNT_TYPES, ACCOUNT_TYPE_LABELS, type AccountType } from "@/lib/types";
 
 export default function SignupPage() {
   const router = useRouter();
+  const [accountType, setAccountType] = useState<AccountType | null>(null);
   const [accountName, setAccountName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const nameLabel = accountType === "COMPANY" ? "Company name" : "Your name";
+  const readyForAccountCreation = Boolean(accountType) && accountName.trim().length > 0;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -41,7 +46,7 @@ export default function SignupPage() {
     const res = await fetch("/api/auth/session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ idToken, accountName }),
+      body: JSON.stringify({ idToken, accountName, accountType }),
     });
 
     if (!res.ok) {
@@ -59,7 +64,7 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-neutral-50 px-4">
+    <main className="flex min-h-screen items-center justify-center bg-neutral-50 px-4 py-10">
       <form
         onSubmit={handleSubmit}
         className="w-full max-w-sm rounded-2xl border border-neutral-200 bg-white p-8 shadow-sm"
@@ -69,21 +74,47 @@ export default function SignupPage() {
           <h1 className="mt-3 text-lg font-semibold text-neutral-900">Create your account</h1>
         </div>
 
+        <p className="mb-1.5 block text-sm text-neutral-600">Which best describes you?</p>
+        <div className="mb-4 grid grid-cols-2 gap-2">
+          {ACCOUNT_TYPES.map((type) => (
+            <button
+              key={type}
+              type="button"
+              onClick={() => setAccountType(type)}
+              className="rounded-md border px-3 py-2 text-sm font-medium transition"
+              style={
+                accountType === type
+                  ? { background: "rgba(142,66,252,0.1)", borderColor: "#8E42FC", color: "#8E42FC" }
+                  : { background: "#fff", borderColor: "#d4d4d4", color: "#525252" }
+              }
+            >
+              {ACCOUNT_TYPE_LABELS[type]}
+            </button>
+          ))}
+        </div>
+
         <label htmlFor="accountName" className="mb-1 block text-sm text-neutral-600">
-          Brand / company name
+          {nameLabel}
         </label>
         <input
           id="accountName"
           type="text"
-          autoFocus
           value={accountName}
           onChange={(e) => setAccountName(e.target.value)}
           className="mb-4 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-neutral-900 outline-none transition focus:border-[#8E42FC] focus:ring-1 focus:ring-[#8E42FC]"
         />
 
-        <SocialAuthButtons accountName={accountName.trim()} disabled={!accountName.trim()} onError={setError} />
-        {!accountName.trim() && (
-          <p className="mt-1.5 text-xs text-neutral-400">Enter a brand/company name to enable these.</p>
+        <SocialAuthButtons
+          accountName={accountName.trim()}
+          accountType={accountType ?? undefined}
+          disabled={!readyForAccountCreation}
+          onError={setError}
+        />
+        {!readyForAccountCreation && (
+          <p className="mt-1.5 text-xs text-neutral-400">
+            Pick a type and fill in {accountType === "COMPANY" ? "a company name" : "your name"} to
+            enable these.
+          </p>
         )}
 
         <div className="my-5 flex items-center gap-3">
@@ -121,7 +152,7 @@ export default function SignupPage() {
 
         <button
           type="submit"
-          disabled={loading || !accountName || !email || !password}
+          disabled={loading || !readyForAccountCreation || !email || !password}
           className="w-full rounded-md px-3 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           style={{ background: "linear-gradient(120deg, #6229CE, #8E42FC 55%, #BC69EB)" }}
         >
