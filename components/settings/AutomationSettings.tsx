@@ -15,10 +15,12 @@ export function AutomationSettings({
   autoApproveMode: initialAutoApproveMode,
   agentCycleTimeSlot: initialTimeSlot,
   cycleMode: initialCycleMode,
+  discoveryKeywords: initialDiscoveryKeywords,
 }: {
   autoApproveMode: boolean;
   agentCycleTimeSlot: string;
   cycleMode: string;
+  discoveryKeywords: string;
 }) {
   const router = useRouter();
 
@@ -32,12 +34,14 @@ export function AutomationSettings({
     autoApproveMode: initialAutoApproveMode,
     timeSlot: initialTimeSlot,
     cycleMode: initialCycleMode,
+    discoveryKeywords: initialDiscoveryKeywords,
   });
 
   // What's currently selected in the UI, not yet saved.
   const [autoApproveMode, setAutoApproveMode] = useState(initialAutoApproveMode);
   const [timeSlot, setTimeSlot] = useState(initialTimeSlot);
   const [cycleMode, setCycleMode] = useState(initialCycleMode);
+  const [discoveryKeywords, setDiscoveryKeywords] = useState(initialDiscoveryKeywords);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,12 +49,14 @@ export function AutomationSettings({
   const isDirty =
     autoApproveMode !== saved.autoApproveMode ||
     timeSlot !== saved.timeSlot ||
-    cycleMode !== saved.cycleMode;
+    cycleMode !== saved.cycleMode ||
+    discoveryKeywords !== saved.discoveryKeywords;
 
   function handleDiscard() {
     setAutoApproveMode(saved.autoApproveMode);
     setTimeSlot(saved.timeSlot);
     setCycleMode(saved.cycleMode);
+    setDiscoveryKeywords(saved.discoveryKeywords);
     setError(null);
   }
 
@@ -61,10 +67,10 @@ export function AutomationSettings({
       const res = await fetch("/api/account/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ autoApproveMode, agentCycleTimeSlot: timeSlot, cycleMode }),
+        body: JSON.stringify({ autoApproveMode, agentCycleTimeSlot: timeSlot, cycleMode, discoveryKeywords }),
       });
       if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? "Failed to save");
-      setSaved({ autoApproveMode, timeSlot, cycleMode });
+      setSaved({ autoApproveMode, timeSlot, cycleMode, discoveryKeywords });
       // The "Run agent cycle" vs. time-slot section is rendered by the
       // parent server component from the account's saved cycleMode — this
       // is what actually makes it flip immediately instead of staying
@@ -165,6 +171,21 @@ export function AutomationSettings({
             Auto-approve 🟢 Auto items
           </button>
         </div>
+      </div>
+
+      <div>
+        <p className="text-sm font-medium text-[var(--text-primary)]">Conversation discovery keywords</p>
+        <p className="mt-1 text-xs text-[var(--text-muted)]">
+          Comma-separated (up to 3 used). Orbit AI always checks your X mentions regardless — these
+          are for proactively finding relevant posts to reply to beyond direct mentions.
+        </p>
+        <input
+          type="text"
+          value={discoveryKeywords}
+          onChange={(e) => setDiscoveryKeywords(e.target.value)}
+          placeholder="e.g. AI marketing agent, social media automation"
+          className="mt-3 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-1)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+        />
       </div>
 
       {isDirty && (

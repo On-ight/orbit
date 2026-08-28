@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db/prisma";
 import { discoverTrends } from "@/lib/agents/discover-trends";
+import { discoverMentions } from "@/lib/agents/discover-mentions";
 import { runTrendAgent } from "@/lib/agents/trend-agent";
 import { runContentAgent } from "@/lib/agents/content-agent";
 import { runCommunityAgent } from "@/lib/agents/community-agent";
@@ -74,6 +75,18 @@ export async function runAgentCycle(
   } catch (err) {
     hadError = true;
     parts.push(`Content Agent crashed: ${String(err)}`);
+  }
+
+  try {
+    const mentionDiscovery = await discoverMentions(accountId);
+    parts.push(
+      mentionDiscovery.ok
+        ? `Mention Discovery: ${mentionDiscovery.created} new mention(s) found`
+        : `Mention Discovery failed: ${mentionDiscovery.error}`,
+    );
+  } catch (err) {
+    hadError = true;
+    parts.push(`Mention Discovery crashed: ${String(err)}`);
   }
 
   try {

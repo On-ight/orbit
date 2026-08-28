@@ -107,6 +107,7 @@ export default async function SettingsPage({
           autoApproveMode={currentUser.account.autoApproveMode}
           agentCycleTimeSlot={currentUser.account.agentCycleTimeSlot}
           cycleMode={currentUser.account.cycleMode}
+          discoveryKeywords={currentUser.account.discoveryKeywords ?? ""}
         />
       </section>
 

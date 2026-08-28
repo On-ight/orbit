@@ -17,6 +17,7 @@ export interface CurrentUser {
     agentCycleTimeSlot: string;
     cycleMode: string;
     onboardingCompletedAt: Date | null;
+    discoveryKeywords: string | null;
   };
 }
 
@@ -53,6 +54,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
       agentCycleTimeSlot: user.account.agentCycleTimeSlot,
       cycleMode: user.account.cycleMode,
       onboardingCompletedAt: user.account.onboardingCompletedAt,
+      discoveryKeywords: user.account.discoveryKeywords,
     },
   };
 }

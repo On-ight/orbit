@@ -49,6 +49,10 @@ model Account {
   // MANUAL deliberately" from "never went through onboarding yet", since
   // MANUAL is itself a valid completed choice, not just an unset default.
   onboardingCompletedAt DateTime?
+  // Comma-separated search terms for live conversation discovery
+  // (discover-mentions.ts) — proactive keyword search, alongside the
+  // account's own X mentions timeline which needs no configuration.
+  discoveryKeywords    String?
 
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
@@ -56,7 +60,7 @@ model Account {
   users                User[]
   bufferChannels       AccountBufferChannel[]
   socialTokens         AccountSocialToken[]
-  mockMentions         MockMention[]
+  mentions             Mention[]
   conversations        Conversation[]
   posts                Post[]
   approvals            Approval[]
@@ -123,22 +127,31 @@ model StripeEvent {
   processedAt DateTime @default(now())
 }
 
-model MockMention {
-  id           String   @id @default(cuid())
-  accountId    String
-  account      Account  @relation(fields: [accountId], references: [id])
+model Mention {
+  id             String   @id @default(cuid())
+  accountId      String
+  account        Account  @relation(fields: [accountId], references: [id])
 
-  authorHandle String
-  authorName   String
-  text         String
-  likes        Int      @default(0)
-  replyCount   Int      @default(0)
-  postedAt     DateTime
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  platform       String   @default("X") // X only for now — matches AccountSocialToken
+  // The platform's own post id — idempotency key so re-running discovery
+  // against overlapping search windows doesn't create duplicate rows for
+  // a post already seen.
+  platformPostId String
+  sourceType     String   // MENTION | KEYWORD_SEARCH — how this was found
+  matchedKeyword String?  // which configured keyword matched, if KEYWORD_SEARCH
 
-  conversation Conversation?
+  authorHandle   String
+  authorName     String
+  text           String
+  likes          Int      @default(0)
+  replyCount     Int      @default(0)
+  postedAt       DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
+  conversation   Conversation?
+
+  @@unique([accountId, platformPostId])
   @@index([accountId])
 }
 
@@ -148,7 +161,7 @@ model Conversation {
   account          Account  @relation(fields: [accountId], references: [id])
 
   sourceMentionId  String   @unique
-  sourceMention    MockMention @relation(fields: [sourceMentionId], references: [id])
+  sourceMention    Mention  @relation(fields: [sourceMentionId], references: [id])
 
   authorHandle     String
   authorName       String

@@ -15,6 +15,7 @@ export async function PATCH(request: NextRequest) {
     agentCycleTimeSlot?: string;
     cycleMode?: string;
     onboardingCompletedAt?: Date;
+    discoveryKeywords?: string;
   } = {};
 
   if (body?.autoApproveMode !== undefined) {
@@ -45,6 +46,13 @@ export async function PATCH(request: NextRequest) {
     }
   }
 
+  if (body?.discoveryKeywords !== undefined) {
+    if (typeof body.discoveryKeywords !== "string" || body.discoveryKeywords.length > 500) {
+      return NextResponse.json({ error: "discoveryKeywords must be a string under 500 characters" }, { status: 400 });
+    }
+    data.discoveryKeywords = body.discoveryKeywords.trim();
+  }
+
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "No valid fields provided" }, { status: 400 });
   }
@@ -59,5 +67,6 @@ export async function PATCH(request: NextRequest) {
     agentCycleTimeSlot: updated.agentCycleTimeSlot,
     cycleMode: updated.cycleMode,
     onboardingCompletedAt: updated.onboardingCompletedAt,
+    discoveryKeywords: updated.discoveryKeywords,
   });
 }

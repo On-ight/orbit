@@ -65,7 +65,7 @@ export async function runCommunityAgentOnMention(
   accountId: string,
   mentionId: string,
 ): Promise<CommunityAgentItemResult> {
-  const mention = await prisma.mockMention.findUnique({ where: { id: mentionId } });
+  const mention = await prisma.mention.findUnique({ where: { id: mentionId } });
   if (!mention) return { mentionId, ok: false, error: "Mention not found" };
 
   const existing = await prisma.conversation.findUnique({ where: { sourceMentionId: mentionId } });
@@ -160,7 +160,7 @@ leave margin rather than write right up to the edge.`,
 }
 
 export async function runCommunityAgent(accountId: string): Promise<CommunityAgentItemResult[]> {
-  const unprocessed = await prisma.mockMention.findMany({
+  const unprocessed = await prisma.mention.findMany({
     where: { accountId, conversation: null },
     select: { id: true },
   });
