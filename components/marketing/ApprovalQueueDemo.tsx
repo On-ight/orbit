@@ -44,10 +44,14 @@ const TIER_BADGE: Record<DemoItem["tier"], string> = {
   never: "bg-[var(--status-critical-soft)] text-[var(--status-critical)]",
 };
 
-type ItemState = "pending" | "approved" | "rejected";
+type ItemState = "pending" | "editing" | "approved" | "rejected";
 
 export function ApprovalQueueDemo() {
   const [states, setStates] = useState<Record<string, ItemState>>({});
+  // Committed text per item, separate from the in-progress textarea value so
+  // Cancel can discard an edit without touching what's actually "saved".
+  const [texts, setTexts] = useState<Record<string, string>>({});
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
 
   return (
     <div className="[perspective:1600px]">
@@ -60,6 +64,7 @@ export function ApprovalQueueDemo() {
 
         {ITEMS.map((item) => {
           const state = states[item.id] ?? "pending";
+          const text = texts[item.id] ?? item.text;
           return (
             <div
               key={item.id}
@@ -71,7 +76,8 @@ export function ApprovalQueueDemo() {
                 </span>
                 <span className="text-xs text-[var(--text-muted)]">{item.meta}</span>
               </div>
-              <p className="text-sm text-[var(--text-primary)]">&quot;{item.text}&quot;</p>
+
+              {state !== "editing" && <p className="text-sm text-[var(--text-primary)]">&quot;{text}&quot;</p>}
 
               {item.tier !== "never" && state === "pending" && (
                 <div className="mt-3 flex gap-2">
@@ -81,7 +87,13 @@ export function ApprovalQueueDemo() {
                   >
                     ✓ Approve
                   </button>
-                  <button className="rounded-md border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition active:scale-95">
+                  <button
+                    onClick={() => {
+                      setDrafts((d) => ({ ...d, [item.id]: text }));
+                      setStates((s) => ({ ...s, [item.id]: "editing" }));
+                    }}
+                    className="rounded-md border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition active:scale-95"
+                  >
                     Edit
                   </button>
                   <button
@@ -90,6 +102,34 @@ export function ApprovalQueueDemo() {
                   >
                     ✕ Reject
                   </button>
+                </div>
+              )}
+
+              {item.tier !== "never" && state === "editing" && (
+                <div className="mt-1">
+                  <textarea
+                    value={drafts[item.id] ?? text}
+                    onChange={(e) => setDrafts((d) => ({ ...d, [item.id]: e.target.value }))}
+                    rows={3}
+                    className="w-full rounded-md border border-[var(--border)] bg-[var(--surface-1)] p-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+                  />
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      onClick={() => {
+                        setTexts((t) => ({ ...t, [item.id]: drafts[item.id] ?? text }));
+                        setStates((s) => ({ ...s, [item.id]: "pending" }));
+                      }}
+                      className="rounded-md border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition active:scale-95"
+                    >
+                      Save edit
+                    </button>
+                    <button
+                      onClick={() => setStates((s) => ({ ...s, [item.id]: "pending" }))}
+                      className="px-3 py-1.5 text-xs font-medium text-[var(--text-muted)] transition hover:text-[var(--text-secondary)]"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               )}
 

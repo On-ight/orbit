@@ -1,7 +1,7 @@
 // Firebase Admin SDK — server-only. Verifies ID tokens/session cookies and
 // creates/deletes Firebase users. Never import this from a "use client" file.
 import { cert, getApps, initializeApp } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
+import { getAuth, type Auth } from "firebase-admin/auth";
 
 function getAdminApp() {
   const existing = getApps();
@@ -22,4 +22,16 @@ function getAdminApp() {
   return initializeApp({ credential: cert({ projectId, clientEmail, privateKey }) });
 }
 
-export const adminAuth = getAuth(getAdminApp());
+let cachedAuth: Auth | null = null;
+
+// Lazy on purpose — this module now gets imported on every marketing page
+// (via Navbar's signed-in check), most of which never actually call this for
+// an anonymous visitor. Initializing eagerly at module load meant just
+// importing this file threw when Firebase env vars were unset, regardless of
+// whether the request ever needed auth.
+export function getAdminAuth(): Auth {
+  if (!cachedAuth) {
+    cachedAuth = getAuth(getAdminApp());
+  }
+  return cachedAuth;
+}

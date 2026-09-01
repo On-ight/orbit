@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { adminAuth } from "@/lib/firebase/admin";
+import { getAdminAuth } from "@/lib/firebase/admin";
 import { attachSessionCookie } from "@/lib/auth/issue-session";
 import { withIpRateLimit } from "@/lib/auth/with-auth";
 import { authSessionLimiter } from "@/lib/redis/rate-limit";
@@ -23,7 +23,7 @@ export const POST = withIpRateLimit(authSessionLimiter, async (request: NextRequ
 
   let decoded;
   try {
-    decoded = await adminAuth.verifyIdToken(idToken);
+    decoded = await getAdminAuth().verifyIdToken(idToken);
   } catch {
     return NextResponse.json({ error: "Invalid or expired sign-in" }, { status: 401 });
   }

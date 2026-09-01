@@ -7,7 +7,7 @@
 //   FOUNDER_EMAIL=... FOUNDER_PASSWORD=... npm run migrate:founder-firebase
 
 import { PrismaClient } from "@prisma/client";
-import { adminAuth } from "../lib/firebase/admin";
+import { getAdminAuth } from "../lib/firebase/admin";
 
 const prisma = new PrismaClient();
 
@@ -29,7 +29,7 @@ async function main() {
     return;
   }
 
-  const firebaseUser = await adminAuth.createUser({
+  const firebaseUser = await getAdminAuth().createUser({
     email: FOUNDER_EMAIL,
     password: FOUNDER_PASSWORD,
     emailVerified: true,

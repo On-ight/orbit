@@ -9,7 +9,7 @@
 // User/Account row, so the extra Firebase revocation lookup is free by
 // comparison — it catches a password change or account disable immediately
 // instead of waiting up to MAX_AGE_SECONDS for the cookie to expire.
-import { adminAuth } from "@/lib/firebase/admin";
+import { getAdminAuth } from "@/lib/firebase/admin";
 import { COOKIE_NAME, MAX_AGE_SECONDS } from "@/lib/auth/cookie";
 
 export interface SessionPayload {
@@ -17,7 +17,7 @@ export interface SessionPayload {
 }
 
 export async function createSessionCookie(idToken: string): Promise<string> {
-  return adminAuth.createSessionCookie(idToken, { expiresIn: MAX_AGE_SECONDS * 1000 });
+  return getAdminAuth().createSessionCookie(idToken, { expiresIn: MAX_AGE_SECONDS * 1000 });
 }
 
 export async function verifySessionCookie(
@@ -26,7 +26,7 @@ export async function verifySessionCookie(
 ): Promise<SessionPayload | null> {
   if (!cookie) return null;
   try {
-    const decoded = await adminAuth.verifySessionCookie(cookie, checkRevoked);
+    const decoded = await getAdminAuth().verifySessionCookie(cookie, checkRevoked);
     return { uid: decoded.uid };
   } catch {
     return null;
