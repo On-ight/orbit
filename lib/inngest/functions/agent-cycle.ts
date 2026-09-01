@@ -20,8 +20,9 @@ export const agentCycleFn = inngest.createFunction(
   {
     id: "agent-cycle",
     // Bounds total simultaneous account cycles against the single shared
-    // Groq API key across all tenants.
-    concurrency: { limit: 10 },
+    // Groq API key across all tenants. Capped at 5 to match Inngest's free
+    // plan concurrency limit — raise this if/when the plan is upgraded.
+    concurrency: { limit: 5 },
     retries: 2,
     triggers: [{ event: AGENT_CYCLE_REQUESTED }],
   },
