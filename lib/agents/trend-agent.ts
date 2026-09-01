@@ -1,7 +1,13 @@
 import { z } from "zod";
+import pLimit from "p-limit";
 import { prisma } from "@/lib/db/prisma";
-import { callStructuredClaude, buildSystemPrompt } from "@/lib/agents/claude-client";
+import { callStructuredCompletion, buildSystemPrompt } from "@/lib/agents/llm-client";
 import { runKeywordPreFilter } from "@/lib/agents/risk-tiers";
+
+// Bounds concurrent LLM calls against the single shared Groq key per account
+// cycle — batches here are already small (see risk-tiers.ts pre-filter), this
+// just cuts wall-clock time per cycle rather than raising per-account QPS a lot.
+const limit = pLimit(3);
 
 const summarySchema = z.object({
   summary: z.string(),
@@ -51,7 +57,7 @@ export async function runTrendAgentOnInput(accountId: string, trendId: string): 
 
   try {
     const system = await buildSystemPrompt(accountId);
-    const result = await callStructuredClaude({
+    const result = await callStructuredCompletion({
       toolName: "record_trend_summary",
       toolDescription: "Records a short summary of a trending topic for use in later post drafting.",
       inputSchema,
@@ -84,9 +90,5 @@ export async function runTrendAgent(accountId: string): Promise<TrendAgentItemRe
     select: { id: true },
   });
 
-  const results: TrendAgentItemResult[] = [];
-  for (const trend of unprocessed) {
-    results.push(await runTrendAgentOnInput(accountId, trend.id));
-  }
-  return results;
+  return Promise.all(unprocessed.map((trend) => limit(() => runTrendAgentOnInput(accountId, trend.id))));
 }

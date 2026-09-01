@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { runAgentCycle } from "@/lib/agents/run-cycle";
+import { inngest, AGENT_CYCLE_REQUESTED } from "@/lib/inngest/client";
 import { AGENT_CYCLE_TIME_SLOTS } from "@/lib/types";
 
-// Web search + multi-platform drafting makes a cycle meaningfully longer
-// than the original X-only version — give it real headroom.
-export const maxDuration = 60;
+// This route only enqueues work now — the actual agent cycles run as
+// durable Inngest functions (lib/inngest/functions/agent-cycle.ts), each
+// isolated per account with its own retries, so this no longer needs a
+// long timeout.
+export const maxDuration = 10;
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
@@ -32,21 +34,19 @@ export async function GET(request: NextRequest) {
   // button — cron is exclusively for accounts that opted into AUTOMATIC.
   const activeAccounts = await prisma.account.findMany({
     where: { subscriptionStatus: "active", cycleMode: "AUTOMATIC", agentCycleTimeSlot: slot },
-    select: { id: true, name: true },
+    select: { id: true },
   });
 
-  const results: { accountId: string; status: string; error?: string }[] = [];
-
-  for (const account of activeAccounts) {
-    // Isolated per account — one tenant's Claude/Buffer failure must not
-    // block the daily cycle for anyone else.
-    try {
-      const result = await runAgentCycle(account.id, "CRON");
-      results.push({ accountId: account.id, status: result.status });
-    } catch (err) {
-      results.push({ accountId: account.id, status: "FAILED", error: String(err) });
-    }
+  if (activeAccounts.length > 0) {
+    // One event per account — Inngest fans these out to isolated function
+    // runs, so one tenant's failure/retry can't block or slow anyone else's.
+    await inngest.send(
+      activeAccounts.map((account) => ({
+        name: AGENT_CYCLE_REQUESTED,
+        data: { accountId: account.id, triggeredBy: "CRON" as const },
+      })),
+    );
   }
 
-  return NextResponse.json({ slot, accountsProcessed: activeAccounts.length, results });
+  return NextResponse.json({ slot, accountsEnqueued: activeAccounts.length });
 }

@@ -1,17 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth/current-user";
+import { NextResponse } from "next/server";
+import { withAuth } from "@/lib/auth/with-auth";
+import { billingLimiter } from "@/lib/redis/rate-limit";
 import { getRazorpayClient } from "@/lib/billing/razorpay";
 import { PLAN_PRICING, isPlanTier } from "@/lib/billing/pricing";
 import { resolveBillingCurrency } from "@/lib/billing/geo";
 
 const MIN_AMOUNT_MINOR_UNITS = 100;
 
-export async function POST(request: NextRequest) {
-  const currentUser = await getCurrentUser();
-  if (!currentUser) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+export const POST = withAuth(async (request, { user: currentUser }) => {
   const body = await request.json().catch(() => null);
   const planTier = body?.planTier;
   if (!isPlanTier(planTier)) {
@@ -42,4 +38,4 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     return NextResponse.json({ error: `Razorpay order creation failed: ${String(err)}` }, { status: 500 });
   }
-}
+}, { rateLimit: billingLimiter });

@@ -1,13 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
-import { getCurrentUser } from "@/lib/auth/current-user";
+import { withAuth } from "@/lib/auth/with-auth";
+import { defaultCrudLimiter } from "@/lib/redis/rate-limit";
 
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
-export async function POST(request: NextRequest) {
-  const currentUser = await getCurrentUser();
-  if (!currentUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
+export const POST = withAuth(async (request) => {
   const form = await request.formData().catch(() => null);
   const file = form?.get("file");
 
@@ -30,4 +28,4 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     return NextResponse.json({ error: `Upload failed: ${String(err)}` }, { status: 502 });
   }
-}
+}, { rateLimit: defaultCrudLimiter });

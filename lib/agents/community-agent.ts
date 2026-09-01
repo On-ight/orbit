@@ -1,9 +1,15 @@
 import { z } from "zod";
+import pLimit from "p-limit";
 import { prisma } from "@/lib/db/prisma";
-import { callStructuredClaude, buildSystemPrompt, ClaudeRefusalError } from "@/lib/agents/claude-client";
+import { callStructuredCompletion, buildSystemPrompt, LlmRefusalError } from "@/lib/agents/llm-client";
 import { resolveRiskTier } from "@/lib/agents/risk-tiers";
 import { autoPublishApproval } from "@/lib/publishing/auto-publish";
 import { INTENT_LEVELS, RISK_TIERS } from "@/lib/types";
+
+// Bounds concurrent LLM calls against the single shared Groq key per account
+// cycle — batches here are already small, this just cuts wall-clock time per
+// cycle rather than raising per-account QPS a lot.
+const limit = pLimit(3);
 
 const analysisSchema = z.object({
   intent: z.enum(INTENT_LEVELS),
@@ -74,7 +80,7 @@ export async function runCommunityAgentOnMention(
   let analysis: z.infer<typeof analysisSchema>;
   try {
     const system = await buildSystemPrompt(accountId);
-    analysis = await callStructuredClaude({
+    analysis = await callStructuredCompletion({
       toolName: "record_conversation_analysis",
       toolDescription:
         "Records intent analysis and a draft reply for a social mention, including a risk self-assessment.",
@@ -101,7 +107,7 @@ leave margin rather than write right up to the edge.`,
     // same retry behavior the Trend Agent already uses. A genuinely
     // content-driven refusal will just fail the same way again next time,
     // which is a wasted call, not a safety issue.
-    const message = err instanceof ClaudeRefusalError ? err.message : String(err);
+    const message = err instanceof LlmRefusalError ? err.message : String(err);
     return { mentionId, ok: false, error: message };
   }
 
@@ -165,9 +171,5 @@ export async function runCommunityAgent(accountId: string): Promise<CommunityAge
     select: { id: true },
   });
 
-  const results: CommunityAgentItemResult[] = [];
-  for (const mention of unprocessed) {
-    results.push(await runCommunityAgentOnMention(accountId, mention.id));
-  }
-  return results;
+  return Promise.all(unprocessed.map((mention) => limit(() => runCommunityAgentOnMention(accountId, mention.id))));
 }

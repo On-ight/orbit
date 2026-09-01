@@ -1,19 +1,19 @@
 import { NextResponse } from "next/server";
-import { runAgentCycle } from "@/lib/agents/run-cycle";
-import { getCurrentUser } from "@/lib/auth/current-user";
+import { inngest, AGENT_CYCLE_REQUESTED } from "@/lib/inngest/client";
+import { withAuth } from "@/lib/auth/with-auth";
+import { agentsRunLimiter } from "@/lib/redis/rate-limit";
 
-// Web search + multi-platform drafting makes a cycle meaningfully longer
-// than the original X-only version — give it real headroom.
-export const maxDuration = 60;
+// Enqueues the cycle and returns immediately — the actual run happens as a
+// durable Inngest function (lib/inngest/functions/agent-cycle.ts), so this
+// no longer needs to hold the connection open for the whole cycle.
+export const POST = withAuth(
+  async (_request, { user: currentUser }) => {
+    await inngest.send({
+      name: AGENT_CYCLE_REQUESTED,
+      data: { accountId: currentUser.accountId, triggeredBy: "MANUAL" },
+    });
 
-export async function POST() {
-  const currentUser = await getCurrentUser();
-  if (!currentUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  try {
-    const result = await runAgentCycle(currentUser.accountId, "MANUAL");
-    return NextResponse.json(result);
-  } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
-  }
-}
+    return NextResponse.json({ enqueued: true });
+  },
+  { rateLimit: agentsRunLimiter },
+);

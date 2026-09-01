@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db/prisma";
 import { RunCycleButton } from "@/components/settings/RunCycleButton";
+import { RunHistory } from "@/components/settings/RunHistory";
 import { KnowledgeBaseManager } from "@/components/settings/KnowledgeBaseManager";
 import { ConnectionsPanel } from "@/components/settings/ConnectionsPanel";
 import { AutomationSettings } from "@/components/settings/AutomationSettings";
@@ -141,30 +142,7 @@ export default async function SettingsPage({
             .
           </p>
         )}
-        {runs.length === 0 ? (
-          <p className="text-sm text-[var(--text-muted)]">No runs yet.</p>
-        ) : (
-          <ul className="space-y-2">
-            {runs.map((run) => (
-              <li key={run.id} className="text-xs text-[var(--text-secondary)]">
-                <span
-                  className="font-medium"
-                  style={{
-                    color:
-                      run.status === "COMPLETED"
-                        ? "var(--status-good)"
-                        : run.status === "FAILED"
-                          ? "var(--status-critical)"
-                          : "var(--status-warning)",
-                  }}
-                >
-                  {run.status}
-                </span>{" "}
-                · {new Date(run.startedAt).toLocaleString()} · {run.summary ?? "in progress"}
-              </li>
-            ))}
-          </ul>
-        )}
+        <RunHistory runs={runs} />
       </section>
 
       <section className="mt-6 rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-5">

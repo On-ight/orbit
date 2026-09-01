@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { TwitterApi } from "twitter-api-v2";
 import { prisma } from "@/lib/db/prisma";
 import { encryptToken, decryptToken } from "@/lib/security/token-crypto";
+import { withIpRateLimit } from "@/lib/auth/with-auth";
+import { xCallbackLimiter } from "@/lib/redis/rate-limit";
 
 const PENDING_COOKIE = "x_oauth_pending";
 
@@ -12,7 +14,9 @@ interface PendingHandshake {
   callbackUrl: string;
 }
 
-export async function GET(request: NextRequest) {
+// Public redirect target — X calls this directly with client-controlled
+// code/state params, no session cookie present, so this is IP-scoped.
+export const GET = withIpRateLimit(xCallbackLimiter, async (request: NextRequest) => {
   const code = request.nextUrl.searchParams.get("code");
   const state = request.nextUrl.searchParams.get("state");
   const pendingCookie = request.cookies.get(PENDING_COOKIE)?.value;
@@ -81,4 +85,4 @@ export async function GET(request: NextRequest) {
     response.cookies.delete(PENDING_COOKIE);
     return response;
   }
-}
+});

@@ -2,13 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { adminAuth } from "@/lib/firebase/admin";
 import { attachSessionCookie } from "@/lib/auth/issue-session";
+import { withIpRateLimit } from "@/lib/auth/with-auth";
+import { authSessionLimiter } from "@/lib/redis/rate-limit";
 import { ACCOUNT_TYPES } from "@/lib/types";
 
 // Firebase Auth (client SDK) does the actual credential check — login/signup
 // pages sign in/up directly against Firebase, then hand the resulting ID
 // token here. This route only verifies that token server-side and maps the
-// Firebase identity onto Orbit's own User/Account rows.
-export async function POST(request: NextRequest) {
+// Firebase identity onto Orbit's own User/Account rows. No session cookie
+// exists yet at this point, so rate limiting is IP-scoped, not account-scoped.
+export const POST = withIpRateLimit(authSessionLimiter, async (request: NextRequest) => {
   const body = await request.json().catch(() => null);
   const idToken = typeof body?.idToken === "string" ? body.idToken : "";
   const accountName = typeof body?.accountName === "string" ? body.accountName.trim() : "";
@@ -54,4 +57,4 @@ export async function POST(request: NextRequest) {
 
   const response = NextResponse.json({ ok: true });
   return attachSessionCookie(response, idToken);
-}
+});

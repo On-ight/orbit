@@ -1,8 +1,14 @@
 import { z } from "zod";
+import pLimit from "p-limit";
 import { prisma } from "@/lib/db/prisma";
-import { callStructuredClaude, buildSystemPrompt } from "@/lib/agents/claude-client";
+import { callStructuredCompletion, buildSystemPrompt } from "@/lib/agents/llm-client";
 import { activeBufferPlatforms, isBufferConfigured, BufferPlatform } from "@/lib/publishing/buffer-client";
 import { PLATFORM_CHAR_LIMITS as PLATFORM_LIMITS } from "@/lib/types";
+
+// Bounds concurrent LLM calls against the single shared Groq key per account
+// cycle — batches here are already small, this just cuts wall-clock time per
+// cycle rather than raising per-account QPS a lot.
+const limit = pLimit(3);
 
 const variantSchema = z.object({
   content: z.string(),
@@ -24,7 +30,7 @@ function platformKey(p: BufferPlatform): string {
 /**
  * Drafts one adapted variant per requested platform in a single call, then
  * validates each platform's sub-object independently (safeParse, not the
- * atomic parse-or-throw callStructuredClaude normally does) — so one bad
+ * atomic parse-or-throw callStructuredCompletion normally does) — so one bad
  * platform (e.g. a LinkedIn draft that ran long) doesn't discard drafts for
  * the other platforms that were actually fine. This mirrors a real lesson
  * from discover-trends.ts: tool-call outputs with more structure than a flat
@@ -66,8 +72,8 @@ async function draftVariantsForTrend(
   const system = await buildSystemPrompt(accountId);
 
   // Loose passthrough schema here on purpose — each platform's sub-object is
-  // validated independently below instead of atomically via callStructuredClaude.
-  const raw = await callStructuredClaude({
+  // validated independently below instead of atomically via callStructuredCompletion.
+  const raw = await callStructuredCompletion({
     toolName: "record_platform_drafts",
     toolDescription: "Records one drafted social post variant per requested platform, adapted to each platform's length and tone.",
     inputSchema: { type: "object", properties, required },
@@ -203,9 +209,5 @@ export async function runContentAgent(accountId: string): Promise<ContentAgentIt
     select: { id: true },
   });
 
-  const results: ContentAgentItemResult[] = [];
-  for (const trend of readyTrends) {
-    results.push(await runContentAgentOnTrend(accountId, trend.id));
-  }
-  return results;
+  return Promise.all(readyTrends.map((trend) => limit(() => runContentAgentOnTrend(accountId, trend.id))));
 }

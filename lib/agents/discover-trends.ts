@@ -1,12 +1,21 @@
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
-import { callStructuredClaude, researchWithWebSearch } from "@/lib/agents/claude-client";
+import { callStructuredCompletion, researchWithWebSearch } from "@/lib/agents/llm-client";
 
 // Bounds both runtime (web search + drafting per trend adds up) and how many
 // fresh items can land in the approval queue from a single morning run.
 // NOTE: this is currently coupled to the fixed trend1/trend2/trend3 slots in
 // extractionSchema below — changing the count means adding/removing slots too.
 const MAX_NEW_TRENDS_PER_CYCLE = 3;
+
+function slugify(topic: string): string {
+  return topic
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 60);
+}
 
 // A nested array-of-objects tool input turned out to be unreliable in
 // practice across repeated real calls — the model variously returned the
@@ -43,8 +52,16 @@ export interface DiscoverTrendsResult {
  * keyword pre-filter in trend-agent.ts already applies to these exactly like
  * manually-seeded ones, which is the reason extraction lands here rather
  * than skipping straight to a draft.
+ *
+ * idempotencyKey scopes the created rows' dedupeKey so a retried call for the
+ * same triggering attempt (e.g. a queue job retry) can't insert the same
+ * trend twice — pass a stable id from the caller's own retry unit (a queue
+ * event id, for instance), not a fresh random value per call.
  */
-export async function discoverTrends(accountId: string): Promise<DiscoverTrendsResult> {
+export async function discoverTrends(
+  accountId: string,
+  idempotencyKey: string,
+): Promise<DiscoverTrendsResult> {
   const account = await prisma.account.findUnique({ where: { id: accountId } });
   if (!account) return { ok: false, created: 0, error: "Account not found" };
 
@@ -105,7 +122,7 @@ new or interesting, say so plainly rather than forcing results.`;
   };
 
   try {
-    const extracted = await callStructuredClaude({
+    const extracted = await callStructuredCompletion({
       toolName: "record_discovered_trends",
       toolDescription:
         "Records up to 3 structured trend topics extracted from research text, one per slot. Use null for any unused slot.",
@@ -141,10 +158,18 @@ ${researchText}
 
     let created = 0;
     for (const t of slots) {
-      await prisma.trendInput.create({
-        data: { accountId, topic: t.topic, rawSignal: t.rawSignal, source: "WEB_SEARCH" },
-      });
-      created++;
+      const dedupeKey = `${idempotencyKey}:${slugify(t.topic)}`;
+      try {
+        await prisma.trendInput.create({
+          data: { accountId, topic: t.topic, rawSignal: t.rawSignal, source: "WEB_SEARCH", dedupeKey },
+        });
+        created++;
+      } catch (err) {
+        // A retry of this same idempotencyKey hit a trend it already created
+        // — not a new row, and not an error.
+        const isDuplicate = err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
+        if (!isDuplicate) throw err;
+      }
     }
     return { ok: true, created };
   } catch (err) {

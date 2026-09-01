@@ -13,13 +13,17 @@
     "vercel-build": "prisma generate && prisma migrate deploy && next build"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.117.1",
     "@prisma/client": "^5.22.0",
+    "@upstash/ratelimit": "^2.0.8",
+    "@upstash/redis": "^1.38.3",
     "@vercel/analytics": "^2.0.1",
     "@vercel/blob": "^2.8.0",
     "firebase": "^12.18.0",
     "firebase-admin": "^14.3.0",
+    "groq-sdk": "^1.6.0",
+    "inngest": "^4.18.1",
     "next": "16.3.1",
+    "p-limit": "^7.3.1",
     "prisma": "^5.22.0",
     "razorpay": "^2.9.8",
     "react": "19.2.8",

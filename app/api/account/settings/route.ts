@@ -1,14 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { getCurrentUser } from "@/lib/auth/current-user";
+import { withAuth } from "@/lib/auth/with-auth";
+import { defaultCrudLimiter } from "@/lib/redis/rate-limit";
 import { AGENT_CYCLE_TIME_SLOTS } from "@/lib/types";
 
 const CYCLE_MODES = ["MANUAL", "AUTOMATIC"];
 
-export async function PATCH(request: NextRequest) {
-  const currentUser = await getCurrentUser();
-  if (!currentUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
+export const PATCH = withAuth(async (request, { user: currentUser }) => {
   const body = await request.json().catch(() => null);
   const data: {
     autoApproveMode?: boolean;
@@ -69,4 +67,4 @@ export async function PATCH(request: NextRequest) {
     onboardingCompletedAt: updated.onboardingCompletedAt,
     discoveryKeywords: updated.discoveryKeywords,
   });
-}
+}, { rateLimit: defaultCrudLimiter });

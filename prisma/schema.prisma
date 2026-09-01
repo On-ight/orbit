@@ -303,8 +303,14 @@ model TrendInput {
   processedAt     DateTime?
   createdAt       DateTime  @default(now())
 
+  // Null for SEED rows. WEB_SEARCH rows set this to `${idempotencyKey}:${slug}`
+  // so a retried discovery run (e.g. a queue job retry) upserts instead of
+  // duplicating — a nullable-unique column allows any number of null rows.
+  dedupeKey       String?
+
   posts           Post[]
 
+  @@unique([accountId, dedupeKey])
   @@index([accountId])
 }
 

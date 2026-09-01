@@ -14,8 +14,14 @@ export function RunCycleButton() {
     try {
       const res = await fetch("/api/agents/run", { method: "POST" });
       const data = await res.json();
-      setResult(res.ok ? data.summary : data.error);
+      // The route now only enqueues the cycle (it runs as a background job) —
+      // it no longer waits for the run to finish, so there's no summary to
+      // show yet. Refresh now and once more shortly after so the new
+      // RUNNING/COMPLETED row shows up in Recent Runs below without a
+      // manual reload.
+      setResult(res.ok ? "Enqueued — check Recent Runs below shortly." : data.error);
       router.refresh();
+      setTimeout(() => router.refresh(), 3000);
     } catch (err) {
       setResult(String(err));
     } finally {
@@ -30,7 +36,7 @@ export function RunCycleButton() {
         disabled={running}
         className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
       >
-        {running ? "Running agent cycle…" : "Run agent cycle"}
+        {running ? "Enqueuing…" : "Run agent cycle"}
       </button>
       {result && <p className="mt-3 text-xs text-[var(--text-muted)]">{result}</p>}
     </div>

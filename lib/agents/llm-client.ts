@@ -1,16 +1,22 @@
-import Anthropic from "@anthropic-ai/sdk";
+import Groq from "groq-sdk";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 
-export const CLAUDE_MODEL = "claude-sonnet-5";
+// Structured tool-calling model. gpt-oss-120b is Groq's flagship for
+// reasoning + reliable JSON/tool-call output.
+export const LLM_MODEL = "openai/gpt-oss-120b";
 
-let client: Anthropic | null = null;
+// Same model, used with the browser_search built-in tool for the free-form
+// research call below. Browser search is only available on the gpt-oss family.
+const WEB_SEARCH_MODEL = "openai/gpt-oss-120b";
 
-function getClient(): Anthropic {
+let client: Groq | null = null;
+
+function getClient(): Groq {
   if (!client) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set");
-    client = new Anthropic({ apiKey, maxRetries: 2 });
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) throw new Error("GROQ_API_KEY is not set");
+    client = new Groq({ apiKey, maxRetries: 2 });
   }
   return client;
 }
@@ -18,8 +24,6 @@ function getClient(): Anthropic {
 // Brand-agnostic — applies to every tenant regardless of what business they
 // run. Each account's own brand voice/positioning/content pillars come from
 // their KnowledgeBaseEntry rows, combined in via buildSystemPrompt() below.
-// Shared across every item processed in an agent cycle, so it's marked for
-// prompt caching — only the first call per account in a run pays full price.
 export const PLATFORM_SAFETY_PROMPT = `You are an AI marketing assistant drafting social content on behalf of a
 business. Follow the brand voice, positioning, and content guidance supplied separately as
 additional context for this specific business — this prompt only covers rules that apply
@@ -84,10 +88,10 @@ closely for tone and substance, within the hard rules above:
 ${kbContext}`;
 }
 
-export class ClaudeRefusalError extends Error {
-  constructor(message = "Claude refused to generate a response for this item") {
+export class LlmRefusalError extends Error {
+  constructor(message = "The model refused to generate a response for this item") {
     super(message);
-    this.name = "ClaudeRefusalError";
+    this.name = "LlmRefusalError";
   }
 }
 
@@ -105,49 +109,50 @@ interface StructuredCallArgs<T> {
 }
 
 /**
- * Forces Claude to respond via a single tool call so we get typed JSON back
- * instead of parsing free text. The result is validated against zodSchema
- * before being returned — if either the tool call or validation fails, this
- * throws and the caller (run-cycle.ts) is responsible for per-item isolation
- * and failing safe on risk classification.
+ * Forces the model to respond via a single tool call so we get typed JSON
+ * back instead of parsing free text. The result is validated against
+ * zodSchema before being returned — if either the tool call or validation
+ * fails, this throws and the caller (lib/inngest/functions/agent-cycle.ts) is responsible for
+ * per-item isolation and failing safe on risk classification.
  */
-export async function callStructuredClaude<T>(args: StructuredCallArgs<T>): Promise<T> {
-  const anthropic = getClient();
+export async function callStructuredCompletion<T>(args: StructuredCallArgs<T>): Promise<T> {
+  const groq = getClient();
 
-  const response = await anthropic.messages.create({
-    model: CLAUDE_MODEL,
-    max_tokens: args.maxTokens ?? 1024,
-    system: [
-      {
-        type: "text",
-        text: args.system,
-        cache_control: { type: "ephemeral" },
-      },
+  const response = await groq.chat.completions.create({
+    model: LLM_MODEL,
+    max_completion_tokens: args.maxTokens ?? 1024,
+    messages: [
+      { role: "system", content: args.system },
+      { role: "user", content: args.userMessage },
     ],
-    messages: [{ role: "user", content: args.userMessage }],
     tools: [
       {
-        name: args.toolName,
-        description: args.toolDescription,
-        input_schema: args.inputSchema as Anthropic.Tool["input_schema"],
+        type: "function",
+        function: {
+          name: args.toolName,
+          description: args.toolDescription,
+          parameters: args.inputSchema,
+        },
       },
     ],
-    tool_choice: { type: "tool", name: args.toolName },
+    tool_choice: { type: "function", function: { name: args.toolName } },
   });
 
-  if (response.stop_reason === "refusal") {
-    throw new ClaudeRefusalError();
+  const choice = response.choices[0];
+  const toolCall = choice.message.tool_calls?.[0];
+
+  if (!toolCall) {
+    // tool_choice was forced, so "stop" with no tool call means the model
+    // declined to comply (Groq's closest equivalent to a refusal) rather
+    // than just running out of tokens.
+    if (choice.finish_reason === "stop") {
+      throw new LlmRefusalError();
+    }
+    throw new Error(`Model did not return a tool call (finish_reason: ${choice.finish_reason})`);
   }
 
-  const toolUse = response.content.find(
-    (block): block is Anthropic.ToolUseBlock => block.type === "tool_use",
-  );
-
-  if (!toolUse) {
-    throw new Error("Claude did not return a tool_use block");
-  }
-
-  return args.zodSchema.parse(toolUse.input);
+  const parsedArgs: unknown = JSON.parse(toolCall.function.arguments);
+  return args.zodSchema.parse(parsedArgs);
 }
 
 interface WebSearchArgs {
@@ -157,40 +162,33 @@ interface WebSearchArgs {
 }
 
 /**
- * Free-form research call using Anthropic's native web_search server tool.
- * Deliberately NOT combined with callStructuredClaude's forced tool_choice —
- * forcing a specific tool blocks the model from taking a search turn first,
- * so this returns plain text; callers extract structured data from it in a
- * second call. Returns null (not an error) when the model didn't produce a
- * normal end-of-turn answer (e.g. paused mid-search, refused, or ran out of
- * budget) — callers should treat that as "nothing found this cycle."
+ * Free-form research call using Groq's built-in browser_search tool
+ * (gpt-oss-120b only). Deliberately separate from callStructuredCompletion's
+ * forced tool_choice — browser_search is documented as incompatible with
+ * structured outputs, so this returns plain text; callers extract structured
+ * data from it in a second call. Returns null (not an error) when the model
+ * didn't produce a normal end-of-turn answer — callers should treat that as
+ * "nothing found this cycle."
  */
 export async function researchWithWebSearch(args: WebSearchArgs): Promise<string | null> {
-  const anthropic = getClient();
+  const groq = getClient();
 
-  const response = await anthropic.messages.create({
-    model: CLAUDE_MODEL,
-    max_tokens: 2048,
-    system: [{ type: "text", text: args.system }],
-    messages: [{ role: "user", content: args.userMessage }],
-    tools: [
-      {
-        type: "web_search_20250305",
-        name: "web_search",
-        max_uses: args.maxSearches ?? 5,
-      },
+  const response = await groq.chat.completions.create({
+    model: WEB_SEARCH_MODEL,
+    max_completion_tokens: 2048,
+    messages: [
+      { role: "system", content: args.system },
+      { role: "user", content: args.userMessage },
     ],
+    tools: [{ type: "browser_search" }],
+    tool_choice: "required",
   });
 
-  if (response.stop_reason !== "end_turn") {
+  const choice = response.choices[0];
+  if (choice.finish_reason !== "stop") {
     return null;
   }
 
-  const text = response.content
-    .filter((block): block is Anthropic.TextBlock => block.type === "text")
-    .map((block) => block.text)
-    .join("\n")
-    .trim();
-
+  const text = choice.message.content?.trim();
   return text || null;
 }

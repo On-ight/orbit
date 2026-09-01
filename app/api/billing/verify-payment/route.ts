@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/db/prisma";
-import { getCurrentUser } from "@/lib/auth/current-user";
+import { withAuth } from "@/lib/auth/with-auth";
+import { billingLimiter } from "@/lib/redis/rate-limit";
 import { getRazorpayClient } from "@/lib/billing/razorpay";
 
 function signatureMatches(orderId: string, paymentId: string, signature: string, keySecret: string): boolean {
@@ -11,12 +12,7 @@ function signatureMatches(orderId: string, paymentId: string, signature: string,
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 
-export async function POST(request: NextRequest) {
-  const currentUser = await getCurrentUser();
-  if (!currentUser) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+export const POST = withAuth(async (request, { user: currentUser }) => {
   const body = await request.json().catch(() => null);
   const razorpay_order_id = body?.razorpay_order_id;
   const razorpay_payment_id = body?.razorpay_payment_id;
@@ -73,4 +69,4 @@ export async function POST(request: NextRequest) {
   });
 
   return NextResponse.json({ success: true });
-}
+}, { rateLimit: billingLimiter });

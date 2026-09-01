@@ -36,7 +36,7 @@ Open [http://localhost:3000](http://localhost:3000). You'll be redirected to
 |---|---|
 | `DATABASE_URL` | Pooled Postgres connection string |
 | `DATABASE_URL_UNPOOLED` | Direct Postgres connection string, used only for running migrations |
-| `ANTHROPIC_API_KEY` | Powers the three agents. Without it, agent runs still complete but every item fails safe to the flagged/`NEVER` risk tier (see Settings page). |
+| `GROQ_API_KEY` | Powers the three agents. Without it, agent runs still complete but every item fails safe to the flagged/`NEVER` risk tier (see Settings page). |
 | `DASHBOARD_PASSWORD` | Shared password gating the whole app — change this before sharing the URL with anyone |
 | `SESSION_SECRET` | Signs the session cookie — use a long random string before deploying anywhere real |
 | `X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_SECRET` | OAuth 1.0a user-context credentials for posting to X directly. Optional if Buffer's X channel is connected. See below. |
@@ -44,6 +44,8 @@ Open [http://localhost:3000](http://localhost:3000). You'll be redirected to
 | `BUFFER_X_CHANNEL_ID`, `BUFFER_THREADS_CHANNEL_ID`, `BUFFER_LINKEDIN_CHANNEL_ID` | Per-platform Buffer channel ids — find them with `npm run buffer:channels`. A platform only gets drafted for if its channel id is set. Buffer takes priority over direct X per-platform. |
 | `CRON_SECRET` | Random string Vercel sends as `Authorization: Bearer <this>` when it fires the daily cron job. Only matters on Vercel, but set here too so local `curl` tests of the cron route work. |
 | `BLOB_READ_WRITE_TOKEN` | Powers LinkedIn image uploads via Vercel Blob. Auto-injected once you add Blob storage from the Vercel dashboard's Storage tab. |
+| `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY` | From an Inngest account (app.inngest.com) — runs the agent cycle pipeline as durable background jobs instead of inline in the request. Locally, `npx inngest-cli@latest dev` works without these. |
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | From an Upstash Redis database (upstash.com) — backs rate limiting and short-TTL caching. |
 
 ## Connecting Buffer (recommended — covers X, Threads, LinkedIn, and real scheduling)
 
@@ -89,7 +91,7 @@ per-user accounts yet.
    some legacy `POSTGRES_*` variables you can ignore) into the project's
    environment variables for you.
 4. **Add the rest of the environment variables** in Project Settings →
-   Environment Variables: `ANTHROPIC_API_KEY`, `DASHBOARD_PASSWORD` (pick a
+   Environment Variables: `GROQ_API_KEY`, `DASHBOARD_PASSWORD` (pick a
    real one — not `changeme`), `SESSION_SECRET` (a long random string — e.g.
    `openssl rand -hex 32`), `CRON_SECRET` (another random string — Vercel
    needs this to authorize its own daily trigger), `BUFFER_API_KEY` plus
@@ -126,11 +128,12 @@ the whole "login system" for now.
 ## How it works
 
 - **Runs itself daily, or on demand.** A Vercel cron job hits `/api/cron/agent-cycle`
-  at 6am IST, gated by a `CRON_SECRET` bearer check (fails closed if the secret
-  is ever unset). **Settings → Run agent cycle** calls the exact same
-  `runAgentCycle()` (`lib/agents/run-cycle.ts`) manually any time — it has no
-  dependency on Request/Response, which is what let cron get bolted on without
-  touching agent code.
+  at 6am IST (and 3 other fixed slots), gated by a `CRON_SECRET` bearer check
+  (fails closed if the secret is ever unset). That route and **Settings → Run
+  agent cycle** both just enqueue one `agent/cycle.requested` event per account
+  via Inngest (`lib/inngest/client.ts`) — the actual cycle runs as a durable
+  background function (`lib/inngest/functions/agent-cycle.ts`), isolated per
+  account with its own retries, instead of inline in the request.
 - **Trend discovery is live, not a fixed batch.** Each cycle, `lib/agents/discover-trends.ts`
   does a real web-search research pass (Anthropic's native `web_search` tool,
   scoped to Delhi/Bangalore and OnSight's content pillars) and extracts up to 3
@@ -163,5 +166,5 @@ the whole "login system" for now.
 See `prisma/schema.prisma` for the data model and `lib/agents/` for the agents:
 `discover-trends.ts` (live web search), `trend-agent.ts`, `content-agent.ts`
 (multi-platform drafting), `community-agent.ts` (replies), plus the shared
-Claude client (`claude-client.ts`) and risk-tier gate (`risk-tiers.ts`).
+LLM client (`llm-client.ts`) and risk-tier gate (`risk-tiers.ts`).
 Publishing lives in `lib/publishing/` (`buffer-client.ts`, `x-client.ts`).

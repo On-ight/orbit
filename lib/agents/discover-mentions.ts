@@ -1,5 +1,11 @@
+import pLimit from "p-limit";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { getXReadClient, getXExternalUserId } from "@/lib/publishing/x-read-client";
+
+// upsertMention is DB-only (no LLM call), so this can run a bit higher than
+// the LLM-calling agent loops.
+const limit = pLimit(5);
 
 // X's pay-per-use pricing bills roughly $0.005 per post read — these caps
 // bound real cost per cycle per account rather than pulling as much as the
@@ -49,10 +55,12 @@ export async function discoverMentions(accountId: string): Promise<DiscoverMenti
         "tweet.fields": ["created_at", "public_metrics"],
         "user.fields": ["username", "name"],
       });
-      for (const tweet of timeline.tweets) {
-        const author = timeline.includes.author(tweet);
-        if (await upsertMention(accountId, tweet, author, "MENTION", null)) created++;
-      }
+      const mentionResults = await Promise.all(
+        timeline.tweets.map((tweet) =>
+          limit(() => upsertMention(accountId, tweet, timeline.includes.author(tweet), "MENTION", null)),
+        ),
+      );
+      created += mentionResults.filter(Boolean).length;
     }
 
     const account = await prisma.account.findUnique({
@@ -74,10 +82,12 @@ export async function discoverMentions(accountId: string): Promise<DiscoverMenti
         "tweet.fields": ["created_at", "public_metrics"],
         "user.fields": ["username", "name"],
       });
-      for (const tweet of results.tweets) {
-        const author = results.includes.author(tweet);
-        if (await upsertMention(accountId, tweet, author, "KEYWORD_SEARCH", keyword)) created++;
-      }
+      const keywordResults = await Promise.all(
+        results.tweets.map((tweet) =>
+          limit(() => upsertMention(accountId, tweet, results.includes.author(tweet), "KEYWORD_SEARCH", keyword)),
+        ),
+      );
+      created += keywordResults.filter(Boolean).length;
     }
 
     return { ok: true, created };
@@ -93,25 +103,30 @@ async function upsertMention(
   sourceType: "MENTION" | "KEYWORD_SEARCH",
   matchedKeyword: string | null,
 ): Promise<boolean> {
-  const existing = await prisma.mention.findUnique({
-    where: { accountId_platformPostId: { accountId, platformPostId: tweet.id } },
-  });
-  if (existing) return false;
-
-  await prisma.mention.create({
-    data: {
-      accountId,
-      platform: "X",
-      platformPostId: tweet.id,
-      sourceType,
-      matchedKeyword,
-      authorHandle: author?.username ?? "unknown",
-      authorName: author?.name ?? "Unknown",
-      text: tweet.text,
-      likes: tweet.public_metrics?.like_count ?? 0,
-      replyCount: tweet.public_metrics?.reply_count ?? 0,
-      postedAt: tweet.created_at ? new Date(tweet.created_at) : new Date(),
-    },
-  });
-  return true;
+  // create-and-catch instead of findUnique-then-create: avoids a
+  // check-then-act race under concurrent/retried execution for the same
+  // account, relying on the DB's own @@unique([accountId, platformPostId])
+  // to reject a duplicate rather than a separate read racing the insert.
+  try {
+    await prisma.mention.create({
+      data: {
+        accountId,
+        platform: "X",
+        platformPostId: tweet.id,
+        sourceType,
+        matchedKeyword,
+        authorHandle: author?.username ?? "unknown",
+        authorName: author?.name ?? "Unknown",
+        text: tweet.text,
+        likes: tweet.public_metrics?.like_count ?? 0,
+        replyCount: tweet.public_metrics?.reply_count ?? 0,
+        postedAt: tweet.created_at ? new Date(tweet.created_at) : new Date(),
+      },
+    });
+    return true;
+  } catch (err) {
+    const isDuplicate = err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
+    if (!isDuplicate) throw err;
+    return false;
+  }
 }

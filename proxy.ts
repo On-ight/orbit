@@ -10,7 +10,7 @@ import { COOKIE_NAME } from "@/lib/auth/cookie";
 const PROTECTED_PAGE_PREFIXES = ["/dashboard", "/approvals", "/content", "/conversations", "/settings", "/onboarding"];
 // API routes default to protected (the safer default for API surface) except
 // these explicit exceptions, which carry no session cookie by design.
-const PUBLIC_API_PREFIXES = ["/api/auth/session", "/api/cron", "/api/webhooks"];
+const PUBLIC_API_PREFIXES = ["/api/auth/session", "/api/cron", "/api/webhooks", "/api/inngest"];
 
 // Cheap gate only — checks the session cookie is *present*, not that it's
 // valid. Firebase Admin's auth module doesn't bundle inside Next's proxy

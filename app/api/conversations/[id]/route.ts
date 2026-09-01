@@ -1,11 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { getCurrentUser } from "@/lib/auth/current-user";
+import { withAuth } from "@/lib/auth/with-auth";
+import { defaultCrudLimiter } from "@/lib/redis/rate-limit";
 
-export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const currentUser = await getCurrentUser();
-  if (!currentUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
+export const PATCH = withAuth<{ params: Promise<{ id: string }> }>(async (request, { params, user: currentUser }) => {
   const { id } = await params;
   const body = await request.json().catch(() => null);
   const action = body?.action as string | undefined;
@@ -34,4 +32,4 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   const updated = await prisma.conversation.findUnique({ where: { id } });
   return NextResponse.json(updated);
-}
+}, { rateLimit: defaultCrudLimiter });
