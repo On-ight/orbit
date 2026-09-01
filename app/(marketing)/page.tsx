@@ -264,16 +264,28 @@ export default function LandingPage() {
             same Auto / Approval / Never policy above, every time.
           </p>
 
-          <figure className="mx-auto mt-10 max-w-lg rounded-xl border border-neutral-200 bg-white p-6 text-left shadow-sm">
-            <blockquote className="text-sm leading-relaxed text-neutral-700">
+          <figure className="mx-auto mt-10 max-w-lg rounded-xl border border-neutral-200 bg-white p-8 text-center shadow-sm">
+            {/* eslint-disable-next-line @next/next/no-img-element -- small static logo, not worth next/image's overhead here */}
+            <img src="/onsight_logo.jpeg" alt="OnSight" className="mx-auto h-8 w-auto" />
+            <p className="mt-3 text-xs font-medium uppercase tracking-wide text-neutral-500">
+              Travel technology · India
+            </p>
+            <blockquote className="mt-6 text-base leading-relaxed text-neutral-700">
               &quot;We&apos;re building OnSight, so marketing often ends up being the thing we postpone. Orbit
               helps us turn what we&apos;re already building into content and stay consistent without making
               social media another full-time job.&quot;
             </blockquote>
-            <figcaption className="mt-4 flex items-center gap-3">
-              {/* eslint-disable-next-line @next/next/no-img-element -- small static logo, not worth next/image's overhead here */}
-              <img src="/onsight_logo.jpeg" alt="OnSight" className="h-6 w-auto rounded" />
-              <span className="text-xs text-neutral-500">Shalini Sharma, CTO, OnSight</span>
+            <figcaption className="mt-6">
+              <p className="text-sm font-semibold text-neutral-900">Shalini Sharma</p>
+              <p className="text-xs text-neutral-500">CTO, OnSight</p>
+              <a
+                href="https://onsight.co.in"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1 inline-block text-xs text-neutral-500 hover:text-neutral-900 hover:underline"
+              >
+                onsight.co.in
+              </a>
             </figcaption>
           </figure>
 
