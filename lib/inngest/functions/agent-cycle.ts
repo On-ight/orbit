@@ -5,6 +5,7 @@ import { runTrendAgent } from "@/lib/agents/trend-agent";
 import { runContentAgent } from "@/lib/agents/content-agent";
 import { runCommunityAgent } from "@/lib/agents/community-agent";
 import { inngest, AGENT_CYCLE_REQUESTED, type AgentCycleRequestedData } from "@/lib/inngest/client";
+import { limitsForTier } from "@/lib/billing/plan-limits";
 
 /**
  * Durable replacement for lib/agents/run-cycle.ts's runAgentCycle(): same 5
@@ -37,6 +38,11 @@ export const agentCycleFn = inngest.createFunction(
       prisma.knowledgeBaseEntry.count({ where: { accountId } }),
     );
 
+    const account = await step.run("load-plan-tier", () =>
+      prisma.account.findUnique({ where: { id: accountId }, select: { planTier: true } }),
+    );
+    const limits = limitsForTier(account?.planTier ?? null);
+
     if (kbCount === 0) {
       const summary = "Skipped — no knowledge base entries yet. Add at least one in Settings first.";
       await step.run("finalize-skipped", () =>
@@ -51,16 +57,20 @@ export const agentCycleFn = inngest.createFunction(
     const parts: string[] = [];
     let hadError = false;
 
-    try {
-      const discovery = await step.run("discover-trends", () => discoverTrends(accountId, run.id));
-      parts.push(
-        discovery.ok
-          ? `Trend Discovery: ${discovery.created} new trend(s) found`
-          : `Trend Discovery failed: ${discovery.error}`,
-      );
-    } catch (err) {
-      hadError = true;
-      parts.push(`Trend Discovery crashed: ${String(err)}`);
+    if (limits.trendResearch) {
+      try {
+        const discovery = await step.run("discover-trends", () => discoverTrends(accountId, run.id));
+        parts.push(
+          discovery.ok
+            ? `Trend Discovery: ${discovery.created} new trend(s) found`
+            : `Trend Discovery failed: ${discovery.error}`,
+        );
+      } catch (err) {
+        hadError = true;
+        parts.push(`Trend Discovery crashed: ${String(err)}`);
+      }
+    } else {
+      parts.push("Trend Discovery: skipped — live trend research requires a paid plan");
     }
 
     try {
@@ -81,25 +91,29 @@ export const agentCycleFn = inngest.createFunction(
       parts.push(`Content Agent crashed: ${String(err)}`);
     }
 
-    try {
-      const mentionDiscovery = await step.run("discover-mentions", () => discoverMentions(accountId));
-      parts.push(
-        mentionDiscovery.ok
-          ? `Mention Discovery: ${mentionDiscovery.created} new mention(s) found`
-          : `Mention Discovery failed: ${mentionDiscovery.error}`,
-      );
-    } catch (err) {
-      hadError = true;
-      parts.push(`Mention Discovery crashed: ${String(err)}`);
-    }
+    if (limits.replyDrafting) {
+      try {
+        const mentionDiscovery = await step.run("discover-mentions", () => discoverMentions(accountId));
+        parts.push(
+          mentionDiscovery.ok
+            ? `Mention Discovery: ${mentionDiscovery.created} new mention(s) found`
+            : `Mention Discovery failed: ${mentionDiscovery.error}`,
+        );
+      } catch (err) {
+        hadError = true;
+        parts.push(`Mention Discovery crashed: ${String(err)}`);
+      }
 
-    try {
-      const communityResults = await step.run("run-community-agent", () => runCommunityAgent(accountId));
-      const communityFailures = communityResults.filter((r) => !r.ok).length;
-      parts.push(`Community Agent: ${communityResults.length} processed, ${communityFailures} failed`);
-    } catch (err) {
-      hadError = true;
-      parts.push(`Community Agent crashed: ${String(err)}`);
+      try {
+        const communityResults = await step.run("run-community-agent", () => runCommunityAgent(accountId));
+        const communityFailures = communityResults.filter((r) => !r.ok).length;
+        parts.push(`Community Agent: ${communityResults.length} processed, ${communityFailures} failed`);
+      } catch (err) {
+        hadError = true;
+        parts.push(`Community Agent crashed: ${String(err)}`);
+      }
+    } else {
+      parts.push("Community Agent: skipped — reply drafting requires a paid plan");
     }
 
     const summary = parts.join(" | ");

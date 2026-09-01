@@ -38,3 +38,10 @@ export const defaultCrudLimiter = new Ratelimit({
   limiter: Ratelimit.slidingWindow(60, "60 s"),
   prefix: "ratelimit:crud",
 });
+
+// Costlier than plain CRUD — an external fetch plus an LLM call.
+export const extractLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(5, "60 s"),
+  prefix: "ratelimit:extract",
+});

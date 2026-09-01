@@ -8,7 +8,6 @@ const ROUTES = [
   { path: "/x-marketing", priority: 0.9 },
   { path: "/threads-marketing", priority: 0.9 },
   { path: "/linkedin-marketing", priority: 0.9 },
-  { path: "/instagram-marketing", priority: 0.7 },
   { path: "/social-media-content-generator", priority: 0.8 },
   { path: "/pricing", priority: 0.8 },
   { path: "/about", priority: 0.5 },

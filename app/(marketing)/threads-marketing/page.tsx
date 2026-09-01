@@ -38,14 +38,14 @@ export default function ThreadsMarketingPage() {
             <div>
               <h3 className="font-medium">Longer-form drafts, not X posts squeezed to fit</h3>
               <p className="mt-1 text-neutral-600">
-                Threads gives you more room than X's 280 characters — Orbit AI drafts to Threads' own
+                Threads gives you more room than X&apos;s 280 characters — Orbit AI drafts to Threads&apos; own
                 limit and tone instead of reusing the same short-form copy across every platform.
               </p>
             </div>
             <div>
               <h3 className="font-medium">Build-in-public recaps, drafted from what actually happened</h3>
               <p className="mt-1 text-neutral-600">
-                Orbit AI can turn a week's worth of shipped features, fixes, and decisions into a recap
+                Orbit AI can turn a week&apos;s worth of shipped features, fixes, and decisions into a recap
                 post worth sharing — grounded in your actual work, not generic filler.
               </p>
             </div>
@@ -62,6 +62,35 @@ export default function ThreadsMarketingPage() {
 
       <section className="border-t border-neutral-200">
         <div className="mx-auto max-w-4xl px-6 py-16">
+          <h2 className="text-2xl font-semibold tracking-tight">What that looks like</h2>
+          <p className="mt-2 text-sm text-neutral-500">Illustrative examples, not real customer posts.</p>
+          <div className="mt-8 grid gap-4 sm:grid-cols-3">
+            <div className="rounded-xl border border-neutral-200 bg-white p-5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Build-in-public recap</p>
+              <p className="mt-2 text-sm text-neutral-700">
+                &quot;Here&apos;s what we learned rebuilding onboarding this week: most drop-off wasn&apos;t confusion —
+                it was asking for too much before showing any value.&quot;
+              </p>
+            </div>
+            <div className="rounded-xl border border-neutral-200 bg-white p-5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Behind the scenes</p>
+              <p className="mt-2 text-sm text-neutral-700">
+                &quot;Spent today debugging a race condition that only showed up under real load. Found it,
+                fixed it, shipping the fix tonight.&quot;
+              </p>
+            </div>
+            <div className="rounded-xl border border-neutral-200 bg-white p-5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Reply draft</p>
+              <p className="mt-2 text-sm text-neutral-700">
+                &quot;Appreciate you trying it out — that&apos;s a known rough edge, fix is already in progress.&quot;
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-neutral-200 bg-neutral-50">
+        <div className="mx-auto max-w-4xl px-6 py-16">
           <h2 className="text-2xl font-semibold tracking-tight">Other platforms Orbit AI covers</h2>
           <div className="mt-8 grid gap-4 sm:grid-cols-2">
             <Link href="/x-marketing" className="rounded-xl border border-neutral-200 p-5 transition hover:border-neutral-400">
@@ -76,7 +105,7 @@ export default function ThreadsMarketingPage() {
         </div>
       </section>
 
-      <section className="border-t border-neutral-200 bg-neutral-50">
+      <section className="border-t border-neutral-200">
         <div className="mx-auto max-w-4xl px-6 py-20 text-center">
           <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">
             Let Orbit AI draft your next Threads post.

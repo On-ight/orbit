@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 const SITE_URL = "https://orbitai.co.in";
 const TITLE = "Orbit AI | AI Marketing Agent for X, Threads & LinkedIn";
 const DESCRIPTION =
-  "Orbit AI is an autonomous AI marketing agent that helps businesses plan, create, and manage social media marketing across X, Threads, and LinkedIn — with Instagram support coming soon.";
+  "Orbit AI is an autonomous AI marketing agent that helps businesses plan, create, and manage social media marketing across X, Threads, and LinkedIn.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -28,7 +28,6 @@ export const metadata: Metadata = {
   keywords: [
     "AI marketing agent",
     "social media AI agent",
-    "Instagram marketing AI",
     "X marketing AI",
     "Threads marketing AI",
     "LinkedIn marketing AI",

@@ -4,6 +4,8 @@ import { prisma } from "@/lib/db/prisma";
 import { callStructuredCompletion, buildSystemPrompt } from "@/lib/agents/llm-client";
 import { activeBufferPlatforms, isBufferConfigured, BufferPlatform } from "@/lib/publishing/buffer-client";
 import { PLATFORM_CHAR_LIMITS as PLATFORM_LIMITS } from "@/lib/types";
+import { limitsForTier } from "@/lib/billing/plan-limits";
+import { countAiGenerationsThisMonth } from "@/lib/billing/usage";
 
 // Bounds concurrent LLM calls against the single shared Groq key per account
 // cycle — batches here are already small, this just cuts wall-clock time per
@@ -204,6 +206,14 @@ export async function runContentAgentOnTrend(accountId: string, trendId: string)
 }
 
 export async function runContentAgent(accountId: string): Promise<ContentAgentItemResult[]> {
+  const account = await prisma.account.findUnique({ where: { id: accountId }, select: { planTier: true } });
+  const limits = limitsForTier(account?.planTier ?? null);
+
+  if (limits.aiGenerationsPerMonth !== null) {
+    const used = await countAiGenerationsThisMonth(accountId);
+    if (used >= limits.aiGenerationsPerMonth) return [];
+  }
+
   const readyTrends = await prisma.trendInput.findMany({
     where: { accountId, riskTier: "AUTO", summary: { not: null } },
     select: { id: true },

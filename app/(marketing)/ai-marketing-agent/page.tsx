@@ -62,11 +62,12 @@ export default function AiMarketingAgentPage() {
           What is an AI marketing agent?
         </h1>
         <p className="mt-6 text-lg text-neutral-600">
-          An AI marketing agent doesn't just generate text on request — it runs the whole loop from
-          "what's worth saying" to "it's live," and hands you the decision points that actually matter
-          instead of every keystroke. Orbit AI is built specifically for social media marketing across
-          X, Threads, and LinkedIn (with Instagram support coming soon), for businesses that don't have
-          the time to write, schedule, and publish every post by hand.
+          An AI marketing agent doesn&apos;t just generate text on request — it runs the whole loop from
+          &quot;what&apos;s worth saying&quot; to &quot;it&apos;s live,&quot; and hands you the decision points that actually matter
+          instead of every keystroke. Think of it as autonomous distribution for what you&apos;re already
+          building: you ship, fix, and launch things — Orbit AI turns that into content across X, Threads,
+          and LinkedIn, for businesses that don&apos;t have the time to write, schedule, and publish every post
+          by hand.
         </p>
         <div className="mt-10">
           <Link
@@ -94,7 +95,7 @@ export default function AiMarketingAgentPage() {
 
       <section className="border-t border-neutral-200">
         <div className="mx-auto max-w-4xl px-6 py-16">
-          <h2 className="text-2xl font-semibold tracking-tight">How Orbit AI's workflow works</h2>
+          <h2 className="text-2xl font-semibold tracking-tight">How Orbit AI&apos;s workflow works</h2>
           <ol className="mt-10 space-y-8">
             {WORKFLOW.map((item, i) => (
               <li key={item.step} className="flex gap-4">
@@ -115,7 +116,7 @@ export default function AiMarketingAgentPage() {
         <div className="mx-auto max-w-4xl px-6 py-16">
           <h2 className="text-2xl font-semibold tracking-tight">Built per platform, not copy-pasted</h2>
           <p className="mt-4 text-neutral-600">
-            X, Threads, and LinkedIn don't work the same way — character limits, tone, and what counts
+            X, Threads, and LinkedIn don&apos;t work the same way — character limits, tone, and what counts
             as a good post all differ. See how Orbit AI handles each one:
           </p>
           <div className="mt-8 grid gap-4 sm:grid-cols-3">

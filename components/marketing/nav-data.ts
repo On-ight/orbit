@@ -6,7 +6,6 @@ export const PLATFORM_LINKS = [
   { href: "/x-marketing", label: "X Marketing" },
   { href: "/threads-marketing", label: "Threads Marketing" },
   { href: "/linkedin-marketing", label: "LinkedIn Marketing" },
-  { href: "/instagram-marketing", label: "Instagram Marketing" },
 ];
 
 export const PRODUCT_LINKS = [

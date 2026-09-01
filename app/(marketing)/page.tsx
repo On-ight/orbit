@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ApprovalQueueDemo } from "@/components/marketing/ApprovalQueueDemo";
 
 const SEGMENTS = [
   {
@@ -27,24 +28,33 @@ const SEGMENTS = [
   },
 ];
 
-const STEPS = [
+const HOW_IT_WORKS = [
   {
-    number: "01",
-    title: "It finds what's worth posting",
-    detail:
-      "Orbit AI researches trends and conversations relevant to your product — not generic filler, tuned to what you actually do.",
+    title: "Research",
+    detail: "Finds product moments, trends, and conversations worth joining — scoped to your brand, not generic filler.",
   },
   {
-    number: "02",
-    title: "It drafts in your voice",
-    detail:
-      "Every draft follows the brand voice, tone, and safety rules you set once — not a generic AI voice, yours.",
+    title: "Create",
+    detail: "Drafts in your voice, adapted per platform — X, Threads, and LinkedIn each get their own version, not one post pasted three times.",
   },
   {
-    number: "03",
-    title: "You approve, it publishes",
-    detail:
-      "Low-risk drafts can go out automatically. Everything else waits in a queue for a yes or a no — across X, Threads, and LinkedIn.",
+    title: "Publish",
+    detail: "Low-risk drafts can go out automatically. Everything else waits for your yes — you're always the last step for anything that matters.",
+  },
+];
+
+const EXAMPLE_DRAFTS = [
+  {
+    platform: "X",
+    text: "We just rebuilt onboarding from scratch. New users now see their first result in under 2 minutes, down from ~15. Small change, huge difference in who sticks around.",
+  },
+  {
+    platform: "Threads",
+    text: "Here's what we learned rebuilding onboarding: most people weren't dropping off because the product was confusing — they were dropping off because we asked for too much before showing any value. Fixed that this week.",
+  },
+  {
+    platform: "LinkedIn",
+    text: "We redesigned our onboarding flow this quarter. The old version asked new users to configure five things before they saw any value — the new one shows a working result first, and lets them customize after. Time-to-first-value dropped from ~15 minutes to under 2.",
   },
 ];
 
@@ -52,7 +62,6 @@ const PLATFORMS = [
   { href: "/x-marketing", label: "X", detail: "Threads, replies, and daily posting cadence." },
   { href: "/threads-marketing", label: "Threads", detail: "Build-in-public recaps and conversation replies." },
   { href: "/linkedin-marketing", label: "LinkedIn", detail: "Company Page posting for B2B distribution." },
-  { href: "/instagram-marketing", label: "Instagram", detail: "Coming soon.", comingSoon: true },
 ];
 
 const JSON_LD = {
@@ -90,16 +99,13 @@ export default function LandingPage() {
       <section className="mx-auto max-w-6xl px-6 py-20 md:py-28">
         <div className="grid items-center gap-14 md:grid-cols-2">
           <div>
-            <p className="text-sm font-medium uppercase tracking-widest text-neutral-500">
-              AI marketing agent
-            </p>
+            <p className="text-sm font-medium uppercase tracking-widest text-neutral-500">AI marketing agent</p>
             <h1 className="mt-4 text-4xl font-semibold leading-tight tracking-tight md:text-5xl">
-              Your AI Marketing Agent for X, Threads &amp; LinkedIn
+              Your marketing team, without the extra hire.
             </h1>
             <p className="mt-5 max-w-md text-lg text-neutral-600">
-              Orbit AI helps businesses plan, create, schedule, publish, and optimize social media
-              marketing across X, Threads, and LinkedIn — from one AI-powered workspace.
-              Instagram support is coming soon.
+              Orbit watches what&apos;s happening in your industry, turns your product updates into content,
+              and publishes across X, Threads &amp; LinkedIn — with you in control.
             </p>
             <div className="mt-8 flex items-center gap-4">
               <Link
@@ -112,65 +118,26 @@ export default function LandingPage() {
                 Already have an account? Sign in →
               </Link>
             </div>
+            <p className="mt-3 text-xs text-neutral-500">No credit card required.</p>
           </div>
 
-          {/* Approval queue mock */}
-          <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4 shadow-sm">
-            <p className="mb-3 text-xs font-medium uppercase tracking-wide text-neutral-500">
-              Approval queue
-            </p>
-            <div className="space-y-3">
-              {[
-                {
-                  platform: "X",
-                  text: "Shipped scheduled publishing today — drafts now queue themselves while you sleep.",
-                  tier: "🟢 Auto",
-                },
-                {
-                  platform: "LinkedIn",
-                  text: "Reply to a prospect asking about our pricing tiers and what's included.",
-                  tier: "🟡 Approval",
-                },
-                {
-                  platform: "Threads",
-                  text: "Weekly build-in-public recap, drafted from this week's commits.",
-                  tier: "🟢 Auto",
-                },
-              ].map((item) => (
-                <div key={item.text} className="rounded-lg border border-neutral-200 bg-white p-3">
-                  <div className="mb-1.5 flex items-center justify-between">
-                    <span className="text-xs font-semibold text-neutral-500">{item.platform}</span>
-                    <span className="text-xs text-neutral-500">{item.tier}</span>
-                  </div>
-                  <p className="text-sm text-neutral-800">{item.text}</p>
-                  <div className="mt-2 flex gap-2">
-                    <span className="rounded bg-neutral-900 px-2 py-1 text-xs font-medium text-white">
-                      Approve
-                    </span>
-                    <span className="rounded border border-neutral-300 px-2 py-1 text-xs font-medium text-neutral-600">
-                      Edit
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <ApprovalQueueDemo />
         </div>
       </section>
 
-      {/* What it does */}
-      <section className="border-t border-neutral-200 bg-neutral-50">
+      {/* How it works */}
+      <section className="border-t border-neutral-200">
         <div className="mx-auto max-w-6xl px-6 py-20">
-          <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">What Orbit AI actually does</h2>
+          <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">
+            Stop treating marketing like another job.
+          </h2>
           <p className="mt-3 max-w-2xl text-neutral-600">
-            Not a scheduler. Not a generic AI writer. Orbit AI is the loop from "what's worth saying" to
-            "it's live" — with you deciding how much of that loop it can run on its own.
+            You build the product. Orbit handles the repetitive distribution work around it.
           </p>
-
           <div className="mt-12 grid gap-10 md:grid-cols-3">
-            {STEPS.map((step) => (
-              <div key={step.number}>
-                <span className="text-sm font-semibold text-neutral-400">{step.number}</span>
+            {HOW_IT_WORKS.map((step, i) => (
+              <div key={step.title}>
+                <span className="text-sm font-semibold text-neutral-400">0{i + 1}</span>
                 <h3 className="mt-2 text-lg font-semibold">{step.title}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-neutral-600">{step.detail}</p>
               </div>
@@ -179,15 +146,80 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Platforms */}
+      {/* One idea, three platforms */}
+      <section className="border-t border-neutral-200 bg-neutral-50">
+        <div className="mx-auto max-w-6xl px-6 py-20">
+          <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">One idea. Three platforms.</h2>
+          <p className="mt-3 max-w-2xl text-neutral-600">
+            The same update, adapted to how each platform actually gets read — not one post pasted three
+            times. Illustrative example below.
+          </p>
+          <div className="mt-10 grid gap-4 md:grid-cols-3">
+            {EXAMPLE_DRAFTS.map((draft) => (
+              <div key={draft.platform} className="rounded-xl border border-neutral-200 bg-white p-5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{draft.platform}</p>
+                <p className="mt-2 text-sm leading-relaxed text-neutral-700">{draft.text}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Control / risk tiers */}
       <section className="border-t border-neutral-200">
+        <div className="mx-auto max-w-6xl px-6 py-20">
+          <div className="grid gap-10 md:grid-cols-2 md:items-center">
+            <div>
+              <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">
+                You decide how autonomous Orbit is.
+              </h2>
+              <p className="mt-4 text-neutral-600">
+                What each risk tier actually covers — not configurable, this is the safety policy every
+                account runs under.
+              </p>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-start gap-3 rounded-lg border border-neutral-200 bg-white p-4">
+                <span className="text-xl">🟢</span>
+                <div>
+                  <p className="font-medium">Auto — the AI just does it</p>
+                  <p className="text-sm text-neutral-600">
+                    Trend collection, analysis, categorization, and drafting for low-risk, on-brand posts.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 rounded-lg border border-neutral-200 bg-white p-4">
+                <span className="text-xl">🟡</span>
+                <div>
+                  <p className="font-medium">Approval — the AI asks you</p>
+                  <p className="text-sm text-neutral-600">
+                    Posts, replies, and sensitive conversations — drafted, but a human approves before anything publishes.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 rounded-lg border border-neutral-200 bg-white p-4">
+                <span className="text-xl">🔴</span>
+                <div>
+                  <p className="font-medium">Never autonomous — always flagged for you</p>
+                  <p className="text-sm text-neutral-600">
+                    Political topics, complaints, accusations, unverified claims — Orbit won&apos;t draft usable content at all.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Platforms */}
+      <section className="border-t border-neutral-200 bg-neutral-50">
         <div className="mx-auto max-w-6xl px-6 py-20">
           <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">One agent, every platform</h2>
           <p className="mt-3 max-w-2xl text-neutral-600">
-            Each platform has its own workflow, character limits, and posting norms — Orbit AI adapts to
-            each one instead of pasting the same text everywhere.
+            Currently supporting X, Threads &amp; LinkedIn — each with its own workflow, character limits, and
+            posting norms.
           </p>
-          <div className="mt-10 grid gap-4 sm:grid-cols-2 md:grid-cols-4">
+          <div className="mt-10 grid gap-4 sm:grid-cols-3">
             {PLATFORMS.map((platform) => (
               <Link
                 key={platform.href}
@@ -196,54 +228,8 @@ export default function LandingPage() {
               >
                 <p className="font-medium">{platform.label}</p>
                 <p className="mt-1 text-sm text-neutral-600">{platform.detail}</p>
-                {platform.comingSoon && (
-                  <span className="mt-2 inline-block rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-500">
-                    Coming soon
-                  </span>
-                )}
               </Link>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Control / risk tiers */}
-      <section className="border-t border-neutral-200 bg-neutral-50">
-        <div className="mx-auto max-w-6xl px-6 py-20">
-          <div className="grid gap-10 md:grid-cols-2 md:items-center">
-            <div>
-              <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">
-                You decide how much runs on its own.
-              </h2>
-              <p className="mt-4 text-neutral-600">
-                Every draft is tagged by risk before you ever see it. Routine, on-brand posts can
-                publish automatically. Anything ambiguous waits for your yes. Anything sensitive
-                never publishes without a human — full stop.
-              </p>
-            </div>
-            <div className="space-y-3">
-              <div className="flex items-start gap-3 rounded-lg border border-neutral-200 bg-white p-4">
-                <span className="text-xl">🟢</span>
-                <div>
-                  <p className="font-medium">Auto</p>
-                  <p className="text-sm text-neutral-600">Low-risk, on-brand — publishes without waiting on you.</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 rounded-lg border border-neutral-200 bg-white p-4">
-                <span className="text-xl">🟡</span>
-                <div>
-                  <p className="font-medium">Approval</p>
-                  <p className="text-sm text-neutral-600">Drafted and queued — you give it a yes or a no.</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 rounded-lg border border-neutral-200 bg-white p-4">
-                <span className="text-xl">🔴</span>
-                <div>
-                  <p className="font-medium">Never</p>
-                  <p className="text-sm text-neutral-600">Flagged for a human to handle — Orbit AI won't touch it.</p>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </section>
@@ -266,11 +252,42 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Final CTA */}
+      {/* Trust — honest, one real testimonial, no invented numbers */}
       <section className="border-t border-neutral-200 bg-neutral-50">
+        <div className="mx-auto max-w-2xl px-6 py-20 text-center">
+          <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">
+            Built for people who care about what gets posted.
+          </h2>
+          <p className="mt-4 text-neutral-600">
+            Orbit is early. We&apos;d rather show you exactly how the approval queue works than promise
+            numbers we can&apos;t back up yet — nothing publishes on your behalf without going through the
+            same Auto / Approval / Never policy above, every time.
+          </p>
+
+          <figure className="mx-auto mt-10 max-w-lg rounded-xl border border-neutral-200 bg-white p-6 text-left shadow-sm">
+            <blockquote className="text-sm leading-relaxed text-neutral-700">
+              &quot;We&apos;re building OnSight, so marketing often ends up being the thing we postpone. Orbit
+              helps us turn what we&apos;re already building into content and stay consistent without making
+              social media another full-time job.&quot;
+            </blockquote>
+            <figcaption className="mt-4 flex items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element -- small static logo, not worth next/image's overhead here */}
+              <img src="/onsight_logo.jpeg" alt="OnSight" className="h-6 w-auto rounded" />
+              <span className="text-xs text-neutral-500">Shalini Sharma, CTO, OnSight</span>
+            </figcaption>
+          </figure>
+
+          <Link href="/about" className="mt-6 inline-block text-sm font-medium text-neutral-900 hover:underline">
+            Read why we built it this way →
+          </Link>
+        </div>
+      </section>
+
+      {/* Final CTA */}
+      <section className="border-t border-neutral-200">
         <div className="mx-auto max-w-6xl px-6 py-20 text-center">
           <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">
-            Stop disappearing while you're busy building.
+            Your product is already doing the work. Orbit makes sure people hear about it.
           </h2>
           <div className="mt-8">
             <Link

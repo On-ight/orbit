@@ -6,6 +6,14 @@ const nextConfig: NextConfig = {
   // when it tries to bundle the package. Marking it external makes Next
   // resolve it via Node's native require/import at runtime instead.
   serverExternalPackages: ["firebase-admin"],
+
+  async redirects() {
+    return [
+      // The Instagram marketing page was removed — Instagram isn't
+      // supported and there's no near-term launch to point visitors toward.
+      { source: "/instagram-marketing", destination: "/", permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -1,6 +1,6 @@
 import type { BillingCurrency } from "./geo";
 
-export const PLAN_TIERS = ["STARTER", "GROWTH", "AGENCY"] as const;
+export const PLAN_TIERS = ["FREE", "BUILDER", "GROWTH", "AGENCY"] as const;
 export type PlanTier = (typeof PLAN_TIERS)[number];
 
 interface TierPricing {
@@ -11,9 +11,10 @@ interface TierPricing {
 
 // USD tiers — international track, confirmed pricing.
 const USD_PRICING: Record<PlanTier, TierPricing> = {
-  STARTER: { amountMinorUnits: 4_990, currency: "USD", label: "$49.90/month" },
-  GROWTH: { amountMinorUnits: 9_990, currency: "USD", label: "$99.90/month" },
-  AGENCY: { amountMinorUnits: 15_990, currency: "USD", label: "$159.90/month" },
+  FREE: { amountMinorUnits: 0, currency: "USD", label: "Free" },
+  BUILDER: { amountMinorUnits: 900, currency: "USD", label: "$9/month" },
+  GROWTH: { amountMinorUnits: 2_900, currency: "USD", label: "$29/month" },
+  AGENCY: { amountMinorUnits: 9_900, currency: "USD", label: "$99/month" },
 };
 
 // INR tiers — direct conversion from the USD tiers at ~87 INR/USD, rounded
@@ -21,9 +22,10 @@ const USD_PRICING: Record<PlanTier, TierPricing> = {
 // if the USD tiers change or the exchange rate drifts, so revisit this
 // periodically rather than treating it as fixed.
 const INR_PRICING: Record<PlanTier, TierPricing> = {
-  STARTER: { amountMinorUnits: 434_100, currency: "INR", label: "₹4,341/month" },
-  GROWTH: { amountMinorUnits: 869_100, currency: "INR", label: "₹8,691/month" },
-  AGENCY: { amountMinorUnits: 1_391_100, currency: "INR", label: "₹13,911/month" },
+  FREE: { amountMinorUnits: 0, currency: "INR", label: "Free" },
+  BUILDER: { amountMinorUnits: 78_300, currency: "INR", label: "₹783/month" },
+  GROWTH: { amountMinorUnits: 252_300, currency: "INR", label: "₹2,523/month" },
+  AGENCY: { amountMinorUnits: 861_300, currency: "INR", label: "₹8,613/month" },
 };
 
 export const PLAN_PRICING: Record<BillingCurrency, Record<PlanTier, TierPricing>> = {

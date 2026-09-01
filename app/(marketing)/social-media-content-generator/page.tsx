@@ -20,7 +20,7 @@ export default function ContentGeneratorPage() {
         <p className="mt-6 text-lg text-neutral-600">
           Most AI content generators start from a blank prompt every time, which is why the output
           reads generic. Orbit AI stores your brand voice, content pillars, and safety rules once, then
-          generates every draft against that — for X, Threads, and LinkedIn, in each platform's own
+          generates every draft against that — for X, Threads, and LinkedIn, in each platform&apos;s own
           format.
         </p>
         <div className="mt-10">
@@ -47,7 +47,7 @@ export default function ContentGeneratorPage() {
             <div>
               <h3 className="font-medium">Grounded in current trends, not stock prompts</h3>
               <p className="mt-1 text-neutral-600">
-                Orbit AI researches what's actually being discussed in your space before generating
+                Orbit AI researches what&apos;s actually being discussed in your space before generating
                 content — so drafts respond to something real, not a generic content-calendar template.
               </p>
             </div>
@@ -63,7 +63,7 @@ export default function ContentGeneratorPage() {
               <h3 className="font-medium">You still approve it</h3>
               <p className="mt-1 text-neutral-600">
                 Generated content lands in a queue, tagged by risk. You edit or approve before anything
-                goes out — the generator doesn't publish on your behalf without a check.
+                goes out — the generator doesn&apos;t publish on your behalf without a check.
               </p>
             </div>
           </div>
@@ -71,6 +71,23 @@ export default function ContentGeneratorPage() {
       </section>
 
       <section className="border-t border-neutral-200">
+        <div className="mx-auto max-w-4xl px-6 py-16">
+          <h2 className="text-2xl font-semibold tracking-tight">A generator is only half of it</h2>
+          <p className="mt-4 text-neutral-600">
+            A generator creates content. Orbit AI decides what should happen next — whether a draft is
+            safe to publish on its own, needs your yes first, or shouldn&apos;t be drafted at all. That
+            approval-queue layer is the actual product; generation is just the first step.
+          </p>
+          <Link
+            href="/ai-marketing-agent"
+            className="mt-4 inline-block text-sm font-medium text-neutral-900 hover:underline"
+          >
+            See how the full agent works →
+          </Link>
+        </div>
+      </section>
+
+      <section className="border-t border-neutral-200 bg-neutral-50">
         <div className="mx-auto max-w-4xl px-6 py-20 text-center">
           <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">
             Generate your first on-brand draft.

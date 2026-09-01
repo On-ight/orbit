@@ -16,11 +16,19 @@ export default function LinkedInMarketingPage() {
           An AI agent for LinkedIn marketing
         </h1>
         <p className="mt-6 text-lg text-neutral-600">
-          LinkedIn is where B2B buyers actually pay attention — but it's also the platform where a
+          LinkedIn is where B2B buyers actually pay attention — but it&apos;s also the platform where a
           careless post costs you the most credibility. Orbit AI drafts Company Page posts built for
           that audience, and nothing reaches LinkedIn without going through your approval queue first.
         </p>
-        <div className="mt-10">
+        <div className="mt-6 rounded-lg border border-neutral-200 bg-neutral-50 p-4">
+          <p className="font-medium">Company Page, not personal profile</p>
+          <p className="mt-1 text-sm text-neutral-600">
+            Orbit AI publishes to your business&apos;s Company Page — building the brand&apos;s presence, not a
+            founder&apos;s personal feed. Most AI writing tools only draft for a personal account; Orbit AI is
+            built for the account that actually represents your company.
+          </p>
+        </div>
+        <div className="mt-8">
           <Link
             href="/signup"
             className="rounded-md bg-neutral-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-neutral-700"
@@ -35,17 +43,10 @@ export default function LinkedInMarketingPage() {
           <h2 className="text-2xl font-semibold tracking-tight">How Orbit AI handles LinkedIn specifically</h2>
           <div className="mt-10 space-y-8">
             <div>
-              <h3 className="font-medium">Company Page, not personal profile</h3>
-              <p className="mt-1 text-neutral-600">
-                Orbit AI publishes to your business's Company Page — building the brand's presence, not
-                a founder's personal feed.
-              </p>
-            </div>
-            <div>
               <h3 className="font-medium">B2B tone, not a shorter X post</h3>
               <p className="mt-1 text-neutral-600">
                 LinkedIn rewards a more professional, context-rich register than X or Threads. Orbit AI
-                drafts accordingly, using LinkedIn's higher character limit instead of cutting the same
+                drafts accordingly, using LinkedIn&apos;s higher character limit instead of cutting the same
                 short-form copy down to fit.
               </p>
             </div>
@@ -60,7 +61,7 @@ export default function LinkedInMarketingPage() {
               <h3 className="font-medium">Every post is reviewed by default</h3>
               <p className="mt-1 text-neutral-600">
                 Given how much a LinkedIn post can carry for a B2B brand, LinkedIn drafts default to the
-                🟡 Approval tier rather than auto-publishing — you're always the last check.
+                🟡 Approval tier rather than auto-publishing — you&apos;re always the last check.
               </p>
             </div>
           </div>
@@ -68,6 +69,37 @@ export default function LinkedInMarketingPage() {
       </section>
 
       <section className="border-t border-neutral-200">
+        <div className="mx-auto max-w-4xl px-6 py-16">
+          <h2 className="text-2xl font-semibold tracking-tight">What that looks like</h2>
+          <p className="mt-2 text-sm text-neutral-500">Illustrative examples, not real customer posts.</p>
+          <div className="mt-8 grid gap-4 sm:grid-cols-3">
+            <div className="rounded-xl border border-neutral-200 bg-white p-5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Product launch</p>
+              <p className="mt-2 text-sm text-neutral-700">
+                &quot;We redesigned our onboarding flow this quarter. The old version asked new users to
+                configure five things before they saw any value — the new one shows a working result
+                first. Time-to-first-value dropped from ~15 minutes to under 2.&quot;
+              </p>
+            </div>
+            <div className="rounded-xl border border-neutral-200 bg-white p-5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Milestone</p>
+              <p className="mt-2 text-sm text-neutral-700">
+                &quot;A short reflection on what changed operationally to get here, and what we&apos;re focused
+                on next.&quot;
+              </p>
+            </div>
+            <div className="rounded-xl border border-neutral-200 bg-white p-5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Thought leadership</p>
+              <p className="mt-2 text-sm text-neutral-700">
+                &quot;A perspective on a shift happening in the industry, grounded in what we&apos;re actually
+                seeing from customers — not a generic hot take.&quot;
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-neutral-200 bg-neutral-50">
         <div className="mx-auto max-w-4xl px-6 py-16">
           <h2 className="text-2xl font-semibold tracking-tight">Other platforms Orbit AI covers</h2>
           <div className="mt-8 grid gap-4 sm:grid-cols-2">
@@ -83,7 +115,7 @@ export default function LinkedInMarketingPage() {
         </div>
       </section>
 
-      <section className="border-t border-neutral-200 bg-neutral-50">
+      <section className="border-t border-neutral-200">
         <div className="mx-auto max-w-4xl px-6 py-20 text-center">
           <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">
             Let Orbit AI draft your next LinkedIn post.

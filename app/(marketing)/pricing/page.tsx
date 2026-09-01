@@ -3,47 +3,66 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { PLAN_PRICING, type PlanTier } from "@/lib/billing/pricing";
+import { PLAN_LIMITS } from "@/lib/billing/plan-limits";
 import { resolveBillingCurrency } from "@/lib/billing/geo";
 import { SubscribeButton } from "@/components/billing/SubscribeButton";
+import { ActivateFreeButton } from "@/components/billing/ActivateFreeButton";
 
 export const metadata: Metadata = {
   title: "Pricing",
   description:
-    "Orbit AI plans for solo founders, growing teams, and agencies managing multiple client accounts across X, Threads, and LinkedIn.",
+    "Orbit AI plans for solo founders, growing startups, and agencies — start free, upgrade when you need more.",
 };
 
-const TIERS: { tier: PlanTier; name: string; audience: string; features: string[] }[] = [
+function generationsLine(tier: PlanTier): string {
+  const limit = PLAN_LIMITS[tier].aiGenerationsPerMonth;
+  return limit === null ? "Unlimited AI generations (fair use)" : `${limit} AI-generated posts & drafts / month`;
+}
+
+const TIERS: { tier: PlanTier; name: string; audience: string; features: string[]; mostPopular?: boolean }[] = [
   {
-    tier: "STARTER",
-    name: "Starter",
-    audience: "Solo founders and indie hackers",
+    tier: "FREE",
+    name: "Free",
+    audience: "For trying Orbit out",
     features: [
-      "One workspace, one team member",
-      "X, Threads, and LinkedIn drafting",
-      "Daily automated trend research",
-      "Full approval queue with risk tiers",
+      "1 X account connected",
+      generationsLine("FREE"),
+      "Full approval queue — Auto / Approval / Never",
+      "Manual publishing — you approve and publish every post",
+      "No credit card required",
+    ],
+  },
+  {
+    tier: "BUILDER",
+    name: "Builder",
+    audience: "For solo founders",
+    features: [
+      "Everything in Free",
+      generationsLine("BUILDER"),
+      "Live trend research — real web search, not templates",
+      "Auto-publish for low-risk (Auto-tier) content",
+      "Reply drafting for mentions",
     ],
   },
   {
     tier: "GROWTH",
     name: "Growth",
-    audience: "Small teams and growing startups",
+    audience: "For growing startups",
+    mostPopular: true,
     features: [
-      "Everything in Starter",
-      "Multiple team members on one workspace",
-      "Custom brand voice and content pillar rules",
+      "Everything in Builder",
+      generationsLine("GROWTH"),
       "Priority support",
     ],
   },
   {
     tier: "AGENCY",
     name: "Agency",
-    audience: "Agencies managing multiple client accounts",
+    audience: "For agencies and teams",
     features: [
       "Everything in Growth",
-      "Multiple client workspaces from one login",
-      "Per-client brand voice and approval queues",
-      "Volume-based account pricing",
+      generationsLine("AGENCY"),
+      "Dedicated priority support & onboarding help",
     ],
   },
 ];
@@ -68,9 +87,19 @@ export default async function PricingPage() {
 
       <section className="border-t border-neutral-200 bg-neutral-50">
         <div className="mx-auto max-w-6xl px-6 py-16">
-          <div className="grid gap-6 md:grid-cols-3">
+          <div className="grid gap-6 md:grid-cols-4">
             {TIERS.map((tier) => (
-              <div key={tier.name} className="rounded-xl border border-neutral-200 bg-white p-6">
+              <div
+                key={tier.name}
+                className={`relative rounded-xl border bg-white p-6 ${
+                  tier.mostPopular ? "border-neutral-900 shadow-sm" : "border-neutral-200"
+                }`}
+              >
+                {tier.mostPopular && (
+                  <span className="absolute -top-3 left-6 rounded-full bg-neutral-900 px-3 py-1 text-xs font-medium text-white">
+                    Most popular
+                  </span>
+                )}
                 <p className="text-lg font-semibold">{tier.name}</p>
                 <p className="mt-1 text-sm text-neutral-500">{tier.audience}</p>
                 <p className="mt-4 text-2xl font-semibold">{pricingForCurrency[tier.tier].label}</p>
@@ -84,13 +113,17 @@ export default async function PricingPage() {
                 </ul>
                 <div className="mt-8">
                   {currentUser ? (
-                    <SubscribeButton planTier={tier.tier} accountName={currentUser.account.name} />
+                    tier.tier === "FREE" ? (
+                      <ActivateFreeButton />
+                    ) : (
+                      <SubscribeButton planTier={tier.tier} accountName={currentUser.account.name} />
+                    )
                   ) : (
                     <Link
                       href="/signup"
                       className="block rounded-md bg-neutral-900 px-4 py-2 text-center text-sm font-medium text-white transition hover:bg-neutral-700"
                     >
-                      Start free
+                      {tier.tier === "FREE" ? "Start for free" : "Start free"}
                     </Link>
                   )}
                 </div>
@@ -99,7 +132,8 @@ export default async function PricingPage() {
           </div>
           {!currentUser && (
             <p className="mt-10 text-center text-sm text-neutral-500">
-              Sign up first, then come back here to activate a plan.
+              Create your free Orbit account — Free activates instantly, no payment info needed. Upgrade to a
+              paid plan any time from Settings.
             </p>
           )}
         </div>
