@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { inngest, AGENT_CYCLE_REQUESTED } from "@/lib/inngest/client";
 import { AGENT_CYCLE_TIME_SLOTS } from "@/lib/types";
+import { expireAllOverdueTrials } from "@/lib/billing/trial";
 
 // This route only enqueues work now — the actual agent cycles run as
 // durable Inngest functions (lib/inngest/functions/agent-cycle.ts), each
@@ -29,6 +30,11 @@ export async function GET(request: NextRequest) {
   const slot = (AGENT_CYCLE_TIME_SLOTS as readonly string[]).includes(slotParam ?? "")
     ? (slotParam as string)
     : "06:00";
+
+  // Catches accounts nobody has logged into since their trial ended — the
+  // lazy per-request check in getCurrentUser() only fires for accounts
+  // someone is actively browsing.
+  await expireAllOverdueTrials();
 
   // MANUAL accounts never run on cron, only via the "Run agent cycle"
   // button — cron is exclusively for accounts that opted into AUTOMATIC.

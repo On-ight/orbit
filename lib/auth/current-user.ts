@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db/prisma";
 import { COOKIE_NAME, verifySessionCookie } from "@/lib/auth/session";
 import { getCachedSessionUid, cacheSessionUid } from "@/lib/redis/session-cache";
+import { isTrialExpired, expireTrialForAccount } from "@/lib/billing/trial";
 
 export interface CurrentUser {
   id: string;
@@ -15,6 +16,7 @@ export interface CurrentUser {
     name: string;
     planTier: string | null;
     subscriptionStatus: string;
+    trialEndsAt: Date | null;
     autoApproveMode: boolean;
     agentCycleTimeSlot: string;
     cycleMode: string;
@@ -59,6 +61,16 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   });
   if (!user) return null;
 
+  // Lazy expiry: flip a FREE account out of "active" the moment anyone
+  // notices it's past trialEndsAt, rather than waiting on the next cron
+  // sweep. Reflected in this same response so the caller sees it
+  // immediately instead of on the following request.
+  let subscriptionStatus = user.account.subscriptionStatus;
+  if (subscriptionStatus === "active" && isTrialExpired(user.account)) {
+    await expireTrialForAccount(user.account.id);
+    subscriptionStatus = "trial_expired";
+  }
+
   return {
     id: user.id,
     email: user.email,
@@ -68,7 +80,8 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
       id: user.account.id,
       name: user.account.name,
       planTier: user.account.planTier,
-      subscriptionStatus: user.account.subscriptionStatus,
+      subscriptionStatus,
+      trialEndsAt: user.account.trialEndsAt,
       autoApproveMode: user.account.autoApproveMode,
       agentCycleTimeSlot: user.account.agentCycleTimeSlot,
       cycleMode: user.account.cycleMode,

@@ -52,7 +52,9 @@ export default function LoginPage() {
         className="w-full max-w-sm rounded-2xl border border-neutral-200 bg-white p-8 shadow-sm"
       >
         <div className="mb-6 flex flex-col items-center text-center">
-          <Image src="/orbit-logo.png" alt="Orbit" width={612} height={408} className="h-10 w-auto" />
+          <Link href="/">
+            <Image src="/orbit-logo.png" alt="Orbit" width={612} height={408} className="h-10 w-auto" />
+          </Link>
           <h1 className="mt-3 text-lg font-semibold text-neutral-900">Sign in to your workspace</h1>
         </div>
 

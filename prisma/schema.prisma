@@ -20,8 +20,13 @@ model Account {
   // signup. Nullable since accounts created before this field existed have
   // no value, not because a new signup can skip choosing one.
   accountType          String?
-  planTier             String?   // STARTER | GROWTH | AGENCY | null
-  subscriptionStatus   String    @default("incomplete") // incomplete | active | past_due | canceled
+  planTier             String?   // FREE | BUILDER | GROWTH | AGENCY | null
+  subscriptionStatus   String    @default("incomplete") // incomplete | active | trial_expired | past_due | canceled
+  // Set once, when the FREE plan is first activated — the 4-day trial
+  // window. Left in place after expiry (never cleared/reset) so a re-POST to
+  // activate-free can detect "already used" and refuse a second trial on the
+  // same account.
+  trialEndsAt          DateTime?
   stripeCustomerId     String?
   stripeSubscriptionId String?
   // Razorpay Standard Checkout — set once the most recent payment's

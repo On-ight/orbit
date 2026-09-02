@@ -23,8 +23,9 @@ const TIERS: { tier: PlanTier; name: string; audience: string; features: string[
   {
     tier: "FREE",
     name: "Free",
-    audience: "For trying Orbit out",
+    audience: "4-day free trial",
     features: [
+      "Full access for 4 days, then choose a paid plan to continue",
       "1 X account connected",
       generationsLine("FREE"),
       "Full approval queue — Auto / Approval / Never",
@@ -81,8 +82,13 @@ export default async function PricingPage() {
         <p className="mt-6 text-lg text-neutral-600">
           {currentUser
             ? "Pick a plan to activate your workspace."
-            : "Start free, see what Orbit AI drafts for your brand, and go from there."}
+            : "Start with a 4-day free trial, see what Orbit AI drafts for your brand, and go from there."}
         </p>
+        {currentUser?.account.subscriptionStatus === "trial_expired" && (
+          <p className="mx-auto mt-4 max-w-md rounded-md bg-[var(--status-warning-soft)] px-4 py-2 text-sm text-[var(--status-warning)]">
+            Your 4-day free trial has ended — pick a plan below to keep using Orbit.
+          </p>
+        )}
       </section>
 
       <section className="border-t border-neutral-200 bg-neutral-50">
@@ -114,7 +120,15 @@ export default async function PricingPage() {
                 <div className="mt-8">
                   {currentUser ? (
                     tier.tier === "FREE" ? (
-                      <ActivateFreeButton />
+                      currentUser.account.trialEndsAt !== null ? (
+                        <p className="rounded-md border border-neutral-200 px-4 py-2 text-center text-sm text-neutral-400">
+                          {currentUser.account.planTier === "FREE" && currentUser.account.subscriptionStatus === "active"
+                            ? "Current plan"
+                            : "Trial already used"}
+                        </p>
+                      ) : (
+                        <ActivateFreeButton />
+                      )
                     ) : (
                       <SubscribeButton planTier={tier.tier} accountName={currentUser.account.name} />
                     )
@@ -132,8 +146,8 @@ export default async function PricingPage() {
           </div>
           {!currentUser && (
             <p className="mt-10 text-center text-sm text-neutral-500">
-              Create your free Orbit account — Free activates instantly, no payment info needed. Upgrade to a
-              paid plan any time from Settings.
+              Create your free Orbit account — Free activates instantly for 4 days, no payment info needed.
+              Upgrade to a paid plan any time from Settings, or after your trial ends.
             </p>
           )}
         </div>
