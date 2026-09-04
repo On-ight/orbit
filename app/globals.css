@@ -24,6 +24,56 @@
   --status-critical-soft: rgba(220, 38, 38, 0.12);
 }
 
+/* Night mode — black/near-black base, same purple brand accent, brightened
+   slightly for contrast against dark surfaces. Applies automatically to a
+   system dark-mode preference, and can be forced either way via
+   data-theme on <html> (see components/dashboard/ThemeToggle.tsx). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --page-plane: #0f0d15;
+    --surface-1: #1a1720;
+    --surface-2: #241f2e;
+    --text-primary: #f2f0f7;
+    --text-secondary: #b8b2c7;
+    --text-muted: #7d7690;
+    --gridline: #2e2838;
+    --border: #332c40;
+
+    --accent: #a463ff;
+    --accent-soft: rgba(164, 99, 255, 0.18);
+    --brand-gradient: linear-gradient(120deg, #7b3ae0, #a463ff 55%, #d08cf0);
+
+    --status-good: #22c55e;
+    --status-good-soft: rgba(34, 197, 94, 0.18);
+    --status-warning: #f59e0b;
+    --status-warning-soft: rgba(245, 158, 11, 0.18);
+    --status-critical: #ef4444;
+    --status-critical-soft: rgba(239, 68, 68, 0.18);
+  }
+}
+
+:root[data-theme="dark"] {
+  --page-plane: #0f0d15;
+  --surface-1: #1a1720;
+  --surface-2: #241f2e;
+  --text-primary: #f2f0f7;
+  --text-secondary: #b8b2c7;
+  --text-muted: #7d7690;
+  --gridline: #2e2838;
+  --border: #332c40;
+
+  --accent: #a463ff;
+  --accent-soft: rgba(164, 99, 255, 0.18);
+  --brand-gradient: linear-gradient(120deg, #7b3ae0, #a463ff 55%, #d08cf0);
+
+  --status-good: #22c55e;
+  --status-good-soft: rgba(34, 197, 94, 0.18);
+  --status-warning: #f59e0b;
+  --status-warning-soft: rgba(245, 158, 11, 0.18);
+  --status-critical: #ef4444;
+  --status-critical-soft: rgba(239, 68, 68, 0.18);
+}
+
 @theme inline {
   --color-background: var(--page-plane);
   --color-foreground: var(--text-primary);

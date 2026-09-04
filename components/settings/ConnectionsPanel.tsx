@@ -27,7 +27,7 @@ function Avatar({ children }: { children: React.ReactNode }) {
 function StatusDot({ ok }: { ok: boolean }) {
   return (
     <span
-      className={`h-2 w-2 rounded-full ${ok ? "" : "bg-neutral-300"}`}
+      className={`h-2 w-2 rounded-full ${ok ? "" : "bg-[var(--text-muted)]"}`}
       style={ok ? { background: "#8E42FC" } : undefined}
     />
   );
@@ -45,11 +45,11 @@ export function ConnectionsPanel({
   notice?: { kind: "success" | "error"; message: string } | null;
 }) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-lg">
+    <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-1)] shadow-lg">
       <div style={{ background: "linear-gradient(120deg, #6229CE, #8E42FC 55%, #BC69EB)" }} className="px-6 py-6">
         <h2 className="text-lg font-semibold text-white">Connect your accounts</h2>
         <p className="mt-1 text-sm text-white/85">
-          Pick a platform to connect it — Orbit AI can only draft and publish once it's linked.
+          Pick a platform to connect it — Orbit AI can only draft and publish once it&apos;s linked.
         </p>
       </div>
 
@@ -57,8 +57,8 @@ export function ConnectionsPanel({
         <div
           className={`px-6 py-3 text-sm ${
             notice.kind === "success"
-              ? "bg-emerald-50 text-emerald-700"
-              : "bg-red-50 text-red-700"
+              ? "bg-[var(--status-good-soft)] text-[var(--status-good)]"
+              : "bg-[var(--status-critical-soft)] text-[var(--status-critical)]"
           }`}
         >
           {notice.message}
@@ -67,12 +67,12 @@ export function ConnectionsPanel({
 
       <div className="grid gap-5 p-6 sm:grid-cols-3">
         {/* X — direct connect */}
-        <div className="flex flex-col rounded-xl border border-neutral-200 p-5 transition hover:border-neutral-300 hover:shadow-sm">
+        <div className="flex flex-col rounded-xl border border-[var(--border)] p-5 transition hover:border-[var(--accent)] hover:shadow-sm">
           <div className="flex items-center gap-3">
             <Avatar>𝕏</Avatar>
             <div className="min-w-0">
-              <p className="font-semibold text-neutral-900">X</p>
-              <p className="flex items-center gap-1.5 text-xs text-neutral-500">
+              <p className="font-semibold text-[var(--text-primary)]">X</p>
+              <p className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
                 <StatusDot ok={x.connected} />
                 {x.connected ? `Connected as @${x.username}` : "Not connected"}
               </p>
@@ -90,7 +90,7 @@ export function ConnectionsPanel({
           </a>
           {x.connected && (
             <form action="/api/connections/x/disconnect" method="POST" className="mt-2 text-center">
-              <button type="submit" className="text-xs text-neutral-400 underline-offset-2 hover:text-neutral-600 hover:underline">
+              <button type="submit" className="text-xs text-[var(--text-muted)] underline-offset-2 hover:text-[var(--text-secondary)] hover:underline">
                 Disconnect
               </button>
             </form>
@@ -98,12 +98,12 @@ export function ConnectionsPanel({
         </div>
 
         {/* Threads — via Buffer */}
-        <div className="flex flex-col rounded-xl border border-neutral-200 p-5 transition hover:border-neutral-300 hover:shadow-sm">
+        <div className="flex flex-col rounded-xl border border-[var(--border)] p-5 transition hover:border-[var(--accent)] hover:shadow-sm">
           <div className="flex items-center gap-3">
             <Avatar>@</Avatar>
             <div className="min-w-0">
-              <p className="font-semibold text-neutral-900">Threads</p>
-              <p className="flex items-center gap-1.5 text-xs text-neutral-500">
+              <p className="font-semibold text-[var(--text-primary)]">Threads</p>
+              <p className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
                 <StatusDot ok={threads.connected} />
                 {threads.connected ? "Connected" : "Not connected"}
               </p>
@@ -116,22 +116,22 @@ export function ConnectionsPanel({
             href={BUFFER_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="block rounded-lg border border-neutral-300 px-4 py-2 text-center text-sm font-medium text-neutral-800 transition hover:border-neutral-400 hover:bg-neutral-50"
+            className="block rounded-lg border border-[var(--border)] px-4 py-2 text-center text-sm font-medium text-[var(--text-primary)] transition hover:border-[var(--accent)] hover:bg-[var(--surface-2)]"
           >
             Connect via Buffer
           </a>
-          <p className="mt-2 text-center text-[11px] font-medium text-red-500">
+          <p className="mt-2 text-center text-[11px] font-medium text-[var(--status-critical)]">
             Requires a third-party service (Buffer)
           </p>
         </div>
 
         {/* LinkedIn — via Buffer */}
-        <div className="flex flex-col rounded-xl border border-neutral-200 p-5 transition hover:border-neutral-300 hover:shadow-sm">
+        <div className="flex flex-col rounded-xl border border-[var(--border)] p-5 transition hover:border-[var(--accent)] hover:shadow-sm">
           <div className="flex items-center gap-3">
             <Avatar>in</Avatar>
             <div className="min-w-0">
-              <p className="font-semibold text-neutral-900">LinkedIn</p>
-              <p className="flex items-center gap-1.5 text-xs text-neutral-500">
+              <p className="font-semibold text-[var(--text-primary)]">LinkedIn</p>
+              <p className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
                 <StatusDot ok={linkedin.connected} />
                 {linkedin.connected ? "Connected" : "Not connected"}
               </p>
@@ -144,11 +144,11 @@ export function ConnectionsPanel({
             href={BUFFER_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="block rounded-lg border border-neutral-300 px-4 py-2 text-center text-sm font-medium text-neutral-800 transition hover:border-neutral-400 hover:bg-neutral-50"
+            className="block rounded-lg border border-[var(--border)] px-4 py-2 text-center text-sm font-medium text-[var(--text-primary)] transition hover:border-[var(--accent)] hover:bg-[var(--surface-2)]"
           >
             Connect via Buffer
           </a>
-          <p className="mt-2 text-center text-[11px] font-medium text-red-500">
+          <p className="mt-2 text-center text-[11px] font-medium text-[var(--status-critical)]">
             Requires a third-party service (Buffer)
           </p>
         </div>

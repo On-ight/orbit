@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/nav/Sidebar";
+import { ThemeToggle } from "@/components/dashboard/ThemeToggle";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/db/prisma";
 
@@ -52,6 +53,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
               <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-good)]" />
               AI active
             </span>
+            <ThemeToggle />
           </div>
         </header>
         <main className="mx-auto max-w-5xl px-6 py-8">{children}</main>

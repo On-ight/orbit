@@ -54,8 +54,20 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        {/* Runs before paint so a stored theme choice applies immediately,
+            instead of flashing light mode first. suppressHydrationWarning
+            above covers the data-theme attribute this sets. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              '(function(){try{var t=localStorage.getItem("orbit-theme");if(t==="dark"||t==="light"){document.documentElement.setAttribute("data-theme",t);}}catch(e){}})();',
+          }}
+        />
+      </head>
       <body className="min-h-full flex flex-col">
         {children}
         <Analytics />
