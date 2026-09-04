@@ -6,6 +6,7 @@ import { runContentAgent } from "@/lib/agents/content-agent";
 import { runCommunityAgent } from "@/lib/agents/community-agent";
 import { inngest, AGENT_CYCLE_REQUESTED, type AgentCycleRequestedData } from "@/lib/inngest/client";
 import { limitsForTier } from "@/lib/billing/plan-limits";
+import { isTrialExpired, expireTrialForAccount } from "@/lib/billing/trial";
 
 /**
  * Durable replacement for lib/agents/run-cycle.ts's runAgentCycle(): same 5
@@ -38,10 +39,39 @@ export const agentCycleFn = inngest.createFunction(
       prisma.knowledgeBaseEntry.count({ where: { accountId } }),
     );
 
-    const account = await step.run("load-plan-tier", () =>
-      prisma.account.findUnique({ where: { id: accountId }, select: { planTier: true } }),
+    const account = await step.run("load-account", () =>
+      prisma.account.findUnique({
+        where: { id: accountId },
+        select: { planTier: true, subscriptionStatus: true, trialEndsAt: true },
+      }),
     );
     const limits = limitsForTier(account?.planTier ?? null);
+
+    // Hard backstop, independent of whatever enqueued this event (cron
+    // already skips inactive accounts, the manual-trigger route checks too)
+    // — this is the one place that guarantees nothing gets drafted or
+    // published for an account that isn't active, no matter how an event
+    // reached here. Re-checks expiry directly rather than trusting a
+    // possibly-stale subscriptionStatus snapshot, since this event could
+    // have sat in Inngest's queue since before the trial actually expired.
+    // trialEndsAt comes back through step.run's JSON memoization as a
+    // string, not a Date, hence the explicit re-parse.
+    const trialEndsAt = account?.trialEndsAt ? new Date(account.trialEndsAt) : null;
+    const expired = account !== null && isTrialExpired({ planTier: account.planTier, trialEndsAt });
+    if (expired) {
+      await step.run("expire-trial", () => expireTrialForAccount(accountId));
+    }
+
+    if (!account || account.subscriptionStatus !== "active" || expired) {
+      const summary = "Skipped — this account isn't on an active plan.";
+      await step.run("finalize-inactive", () =>
+        prisma.agentRun.update({
+          where: { id: run.id },
+          data: { status: "FAILED", summary, completedAt: new Date() },
+        }),
+      );
+      return { agentRunId: run.id, status: "FAILED", summary };
+    }
 
     if (kbCount === 0) {
       const summary = "Skipped — no knowledge base entries yet. Add at least one in Settings first.";
