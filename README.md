@@ -46,6 +46,12 @@ Open [http://localhost:3000](http://localhost:3000). You'll be redirected to
 | `BLOB_READ_WRITE_TOKEN` | Powers LinkedIn image uploads via Vercel Blob. Auto-injected once you add Blob storage from the Vercel dashboard's Storage tab. |
 | `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY` | From an Inngest account (app.inngest.com) — runs the agent cycle pipeline as durable background jobs instead of inline in the request. Locally, `npx inngest-cli@latest dev` works without these. |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | From an Upstash Redis database (upstash.com) — backs rate limiting and short-TTL caching. |
+| `APP_URL` | This app's own public base URL (e.g. `https://orbitai.co.in`) — used to build the Creatomate webhook callback URL from a background job, which has no incoming request to derive it from. Falls back to Vercel's auto-populated `VERCEL_URL` if unset. |
+| `CREATOMATE_API_KEY` | From a Creatomate account (creatomate.com) — renders Reels from a template. |
+| `CREATOMATE_TEMPLATE_PRODUCT`, `_UGC`, `_CINEMATIC`, `_FOUNDER`, `_MEME` | One Creatomate template id per Reel style — these must be built by hand in Creatomate's visual editor first; there's no API to create them. Each template needs elements named exactly `Hook-Text`, `Scene-1-Text`..`Scene-N-Text`, `CTA-Text`, and `Voiceover-Audio` for the render pipeline to populate. |
+| `CREATOMATE_WEBHOOK_SECRET` | Random string appended to the webhook callback URL as `?secret=` — Creatomate calls this route with no session, so this is the payload-authenticity check. |
+| `ELEVENLABS_API_KEY` | From an ElevenLabs account (elevenlabs.io) — generates Reel voiceovers. |
+| `ELEVENLABS_VOICE_FEMALE`, `ELEVENLABS_VOICE_MALE` | Voice ids from your ElevenLabs voice library — one curated voice per gender is enough to make Reels work. Optionally add `ELEVENLABS_VOICE_FEMALE_ENERGETIC` etc. (gender + tone) for finer control; falls back to the per-gender default when a specific combination isn't set. |
 
 ## Connecting Buffer (recommended — covers X, Threads, LinkedIn, and real scheduling)
 

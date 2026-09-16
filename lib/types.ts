@@ -7,7 +7,7 @@ export type IntentLevel = (typeof INTENT_LEVELS)[number];
 export const CONVERSATION_STATUSES = ["NEW", "DRAFTED", "REPLIED", "IGNORED"] as const;
 export type ConversationStatus = (typeof CONVERSATION_STATUSES)[number];
 
-export const APPROVAL_TYPES = ["POST", "REPLY", "COMMUNITY_INVITE"] as const;
+export const APPROVAL_TYPES = ["POST", "REPLY", "COMMUNITY_INVITE", "REEL"] as const;
 export type ApprovalType = (typeof APPROVAL_TYPES)[number];
 
 export const APPROVAL_STATUSES = ["PENDING", "APPROVED", "REJECTED", "EDITED"] as const;
@@ -49,3 +49,49 @@ export const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
   ARTIST: "Artist",
   OTHER: "Other",
 };
+
+// Reels — short-form video. Deliberately NOT added to PLATFORMS: that union
+// doubles as BufferPlatform (lib/publishing/buffer-client.ts), and Buffer
+// has no Instagram support in this app — widening it would misleadingly
+// imply otherwise. Approval.platform for a Reel is just the literal string
+// "INSTAGRAM", an unconstrained DB column, not this shared union.
+export const REEL_MODES = ["PRODUCT_LAUNCH", "EDUCATIONAL", "TREND_STORY"] as const;
+export type ReelMode = (typeof REEL_MODES)[number];
+
+export const REEL_MODE_LABELS: Record<ReelMode, string> = {
+  PRODUCT_LAUNCH: "🚀 Product Launch",
+  EDUCATIONAL: "🧠 Educational",
+  TREND_STORY: "🔥 Trend / Story",
+};
+
+export const REEL_STYLES = ["PRODUCT", "UGC", "CINEMATIC", "FOUNDER", "MEME"] as const;
+export type ReelStyle = (typeof REEL_STYLES)[number];
+
+export const REEL_STYLE_LABELS: Record<ReelStyle, string> = {
+  PRODUCT: "Product",
+  UGC: "UGC",
+  CINEMATIC: "Cinematic",
+  FOUNDER: "Founder",
+  MEME: "Meme",
+};
+
+export const REEL_VOICE_GENDERS = ["FEMALE", "MALE"] as const;
+export type ReelVoiceGender = (typeof REEL_VOICE_GENDERS)[number];
+
+export const REEL_VOICE_TONES = ["PROFESSIONAL", "ENERGETIC", "CALM", "CONVERSATIONAL"] as const;
+export type ReelVoiceTone = (typeof REEL_VOICE_TONES)[number];
+
+export const REEL_STATUSES = [
+  "OPPORTUNITY",
+  "SCRIPT_OPTIONS",
+  "RENDERING",
+  "READY",
+  "FAILED",
+  "APPROVED",
+  "REJECTED",
+] as const;
+export type ReelStatus = (typeof REEL_STATUSES)[number];
+
+// Instagram's actual caption limit — kept local to Reels rather than added
+// to PLATFORM_CHAR_LIMITS, for the same reason INSTAGRAM isn't in PLATFORMS.
+export const INSTAGRAM_CAPTION_LIMIT = 2200;

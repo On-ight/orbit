@@ -51,6 +51,15 @@ function ContentIcon() {
   );
 }
 
+function ReelsIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M6.5 5.5L10.5 8L6.5 10.5V5.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function SettingsIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -70,6 +79,7 @@ const NAV_ITEMS = [
   { href: "/approvals", label: "Approvals", icon: ApprovalsIcon },
   { href: "/conversations", label: "Conversations", icon: ConversationsIcon },
   { href: "/content", label: "Content", icon: ContentIcon },
+  { href: "/reels", label: "Reels", icon: ReelsIcon },
   { href: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 

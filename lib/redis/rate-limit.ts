@@ -45,3 +45,12 @@ export const extractLimiter = new Ratelimit({
   limiter: Ratelimit.slidingWindow(5, "60 s"),
   prefix: "ratelimit:extract",
 });
+
+// Reel script generation/version-selection — LLM calls plus (at
+// select-version time) real vendor spend on rendering, on top of the
+// monthly plan quota enforced separately.
+export const reelGenerationLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(5, "60 s"),
+  prefix: "ratelimit:reel-generation",
+});

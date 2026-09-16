@@ -8,13 +8,17 @@ export interface PlanLimits {
   aiGenerationsPerMonth: number | null; // null = unlimited (fair-use)
   trendResearch: boolean;
   replyDrafting: boolean;
+  // Reels are real per-unit vendor cost (video render + voiceover), unlike
+  // text generations — kept as its own hard cap, never unlimited, per the
+  // explicit warning that unlimited AI video would destroy margins.
+  reelsPerMonth: number;
 }
 
 export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
-  FREE: { aiGenerationsPerMonth: 10, trendResearch: false, replyDrafting: false },
-  BUILDER: { aiGenerationsPerMonth: 100, trendResearch: true, replyDrafting: true },
-  GROWTH: { aiGenerationsPerMonth: null, trendResearch: true, replyDrafting: true },
-  AGENCY: { aiGenerationsPerMonth: null, trendResearch: true, replyDrafting: true },
+  FREE: { aiGenerationsPerMonth: 10, trendResearch: false, replyDrafting: false, reelsPerMonth: 0 },
+  BUILDER: { aiGenerationsPerMonth: 100, trendResearch: true, replyDrafting: true, reelsPerMonth: 5 },
+  GROWTH: { aiGenerationsPerMonth: null, trendResearch: true, replyDrafting: true, reelsPerMonth: 20 },
+  AGENCY: { aiGenerationsPerMonth: null, trendResearch: true, replyDrafting: true, reelsPerMonth: 100 },
 };
 
 export function limitsForTier(tier: string | null): PlanLimits {

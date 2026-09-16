@@ -73,6 +73,7 @@ model Account {
   dailySnapshots       DailySnapshot[]
   trendInputs          TrendInput[]
   knowledgeBaseEntries KnowledgeBaseEntry[]
+  reels                Reel[]
 }
 
 model User {
@@ -229,7 +230,7 @@ model Approval {
   accountId      String
   account        Account  @relation(fields: [accountId], references: [id])
 
-  type           String   // POST | REPLY | COMMUNITY_INVITE
+  type           String   // POST | REPLY | COMMUNITY_INVITE | REEL
   status         String   @default("PENDING") // PENDING | APPROVED | REJECTED | EDITED
   platform       String   @default("X")
 
@@ -243,6 +244,8 @@ model Approval {
   conversation   Conversation? @relation(fields: [conversationId], references: [id])
   postId         String?
   post           Post?    @relation(fields: [postId], references: [id])
+  reelId         String?
+  reel           Reel?    @relation(fields: [reelId], references: [id])
 
   // Set when this approval was published directly (not via a linked Post) —
   // currently REPLY approvals published through Buffer, which schedules a
@@ -314,9 +317,52 @@ model TrendInput {
   dedupeKey       String?
 
   posts           Post[]
+  reels           Reel[]
 
   @@unique([accountId, dedupeKey])
   @@index([accountId])
+}
+
+model Reel {
+  id                 String    @id @default(cuid())
+  accountId          String
+  account            Account   @relation(fields: [accountId], references: [id])
+
+  mode               String    // PRODUCT_LAUNCH | EDUCATIONAL | TREND_STORY
+  style              String?   // PRODUCT | UGC | CINEMATIC | FOUNDER | MEME — set at select-version time
+  // OPPORTUNITY | SCRIPT_OPTIONS | RENDERING | READY | FAILED | APPROVED | REJECTED
+  status             String    @default("SCRIPT_OPTIONS")
+
+  title              String?
+  // Array of generated script options (label/title/duration/hook/scenes),
+  // produced once by reel-script-agent.ts — first Json column in this
+  // schema, Postgres supports it natively.
+  versions           Json?
+  selectedVersionIndex Int?
+  // The chosen version's storyboard, copied out of `versions` at
+  // select-version time so rendering doesn't depend on `versions` staying
+  // unchanged/re-parsed.
+  script             Json?
+
+  voiceGender        String?   // FEMALE | MALE
+  voiceTone          String?   // PROFESSIONAL | ENERGETIC | CALM | CONVERSATIONAL
+
+  videoUrl           String?
+  thumbnailUrl       String?
+  description        String?
+  hashtags           String?   // comma-separated, matches discoveryKeywords/matchedKeywords convention
+
+  creatomateRenderId String?
+
+  sourceTrendId      String?
+  sourceTrend        TrendInput? @relation(fields: [sourceTrendId], references: [id])
+
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  approvals          Approval[]
+
+  @@index([accountId, status])
 }
 
 model KnowledgeBaseEntry {

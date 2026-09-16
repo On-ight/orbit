@@ -17,3 +17,15 @@ export async function countAiGenerationsThisMonth(accountId: string): Promise<nu
 
   return posts + replyApprovals;
 }
+
+// Reels are counted separately from countAiGenerationsThisMonth — real
+// per-unit vendor cost (video render + voiceover), a stricter cap than text
+// generations, checked at the point rendering is actually triggered (not at
+// script-drafting time, which is cheap LLM-only work).
+export async function countReelsThisMonth(accountId: string): Promise<number> {
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+
+  return prisma.approval.count({ where: { accountId, type: "REEL", createdAt: { gte: startOfMonth } } });
+}

@@ -126,6 +126,13 @@ export const PATCH = withAuth<{ params: Promise<{ id: string }> }>(async (reques
         },
       });
     }
+    // No live-publish path for Reels — Instagram isn't a Buffer platform, so
+    // bufferPlatform above is always undefined for one and livePublish stays
+    // null. Approving just flips status; the caption/hashtags are already
+    // ready to grab from the card.
+    if (approval.reelId) {
+      await prisma.reel.update({ where: { id: approval.reelId }, data: { status: "APPROVED" } });
+    }
 
     return NextResponse.json(updated);
   }
@@ -141,6 +148,9 @@ export const PATCH = withAuth<{ params: Promise<{ id: string }> }>(async (reques
       where: { id: approval.conversationId },
       data: { status: "IGNORED" },
     });
+  }
+  if (approval.reelId) {
+    await prisma.reel.update({ where: { id: approval.reelId }, data: { status: "REJECTED" } });
   }
 
   return NextResponse.json(updated);

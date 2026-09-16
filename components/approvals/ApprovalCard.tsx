@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { RiskBadge } from "@/components/dashboard/Badge";
-import { PLATFORM_CHAR_LIMITS, Platform } from "@/lib/types";
+import { PLATFORM_CHAR_LIMITS, Platform, INSTAGRAM_CAPTION_LIMIT } from "@/lib/types";
 
 export interface ApprovalCardData {
   id: string;
@@ -18,15 +18,19 @@ export interface ApprovalCardData {
   riskTier: string;
   createdAt: string;
   conversation: { authorHandle: string; originalText: string } | null;
+  // Reel-only — null for every other approval type.
+  reel: { videoUrl: string | null; hashtags: string | null } | null;
 }
 
 const TYPE_LABEL: Record<string, string> = {
   POST: "📝 Post",
   REPLY: "💬 Reply",
   COMMUNITY_INVITE: "🤝 Community invite",
+  REEL: "🎬 Reel",
 };
 
 function charLimitFor(platform: string): number {
+  if (platform === "INSTAGRAM") return INSTAGRAM_CAPTION_LIMIT;
   return PLATFORM_CHAR_LIMITS[platform as Platform] ?? 280;
 }
 
@@ -108,6 +112,9 @@ export function ApprovalCard({
         ? `Approving this will schedule it via Buffer for ${new Date(scheduledFor).toLocaleString()}.`
         : "Approving this will queue it via Buffer for the next available slot.";
     }
+    if (approval.type === "REEL") {
+      return "Orbit doesn't publish to Instagram automatically yet — approving marks this ready, then download the video and post it yourself.";
+    }
     return "No publishing connection configured for this platform — approving this will only mark it published in the demo pipeline.";
   }
 
@@ -124,6 +131,20 @@ export function ApprovalCard({
         </div>
         <RiskBadge tier={approval.riskTier} />
       </div>
+
+      {approval.type === "REEL" && approval.reel?.videoUrl && (
+        <div className="mb-3">
+          {/* Captions are burned into the video by the Creatomate template, not a separate track. */}
+          <video
+            src={approval.reel.videoUrl}
+            controls
+            className="max-h-96 w-full rounded-lg border border-[var(--border)] bg-black"
+          />
+          {approval.reel.hashtags && (
+            <p className="mt-1 text-xs text-[var(--text-muted)]">#{approval.reel.hashtags.split(",").map((h) => h.trim()).join(" #")}</p>
+          )}
+        </div>
+      )}
 
       {approval.conversation && (
         <div className="mb-3 rounded-lg bg-[var(--surface-2)] p-3 text-sm text-[var(--text-secondary)]">

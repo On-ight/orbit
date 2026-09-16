@@ -32,7 +32,10 @@ export default async function ApprovalsPage({
       status: { in: ["PENDING", "EDITED"] },
       ...(activeTab ? { platform: activeTab } : {}),
     },
-    include: { conversation: { select: { authorHandle: true, originalText: true } } },
+    include: {
+      conversation: { select: { authorHandle: true, originalText: true } },
+      reel: { select: { videoUrl: true, hashtags: true } },
+    },
     orderBy: { createdAt: "desc" },
   });
 

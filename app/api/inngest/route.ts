@@ -1,6 +1,7 @@
 import { serve } from "inngest/next";
 import { inngest } from "@/lib/inngest/client";
 import { agentCycleFn } from "@/lib/inngest/functions/agent-cycle";
+import { reelPipelineFn } from "@/lib/inngest/functions/reel-pipeline";
 
 // Each Inngest step executes as its own call into this route — without an
 // explicit maxDuration, Vercel's short default (10s on Hobby) can kill a
@@ -10,5 +11,5 @@ export const maxDuration = 60;
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
-  functions: [agentCycleFn],
+  functions: [agentCycleFn, reelPipelineFn],
 });
