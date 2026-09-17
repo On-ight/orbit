@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/db/prisma";
 import { RunCycleButton } from "@/components/settings/RunCycleButton";
 import { RunHistory } from "@/components/settings/RunHistory";
@@ -44,6 +45,13 @@ const TIER_GROUPS: { tier: string; label: string; color: string; actions: string
     ],
   },
 ];
+
+const PLAN_LABEL: Record<string, string> = {
+  FREE: "Free",
+  BUILDER: "Builder",
+  GROWTH: "Growth",
+  AGENCY: "Agency",
+};
 
 const SLOT_LABELS: Record<string, string> = {
   "00:00": "12:00 AM IST",
@@ -98,6 +106,24 @@ export default async function SettingsPage({
           notice={notice}
         />
       </div>
+
+      <section className="mt-6 flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-5">
+        <div>
+          <h2 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Plan</h2>
+          <p className="text-xs text-[var(--text-muted)]">
+            {currentUser.account.planTier ? PLAN_LABEL[currentUser.account.planTier] ?? currentUser.account.planTier : "No plan selected yet"}
+            {currentUser.account.subscriptionStatus === "trial_expired" && " — your free trial has ended"}
+          </p>
+        </div>
+        <Link
+          href="/pricing"
+          className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
+        >
+          {currentUser.account.planTier === "FREE" || currentUser.account.subscriptionStatus === "trial_expired"
+            ? "Upgrade plan"
+            : "Manage plan"}
+        </Link>
+      </section>
 
       <section className="mt-6 rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-5">
         <h2 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Automation</h2>
