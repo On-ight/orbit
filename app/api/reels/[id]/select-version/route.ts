@@ -6,14 +6,7 @@ import { inngest, REEL_GENERATION_REQUESTED } from "@/lib/inngest/client";
 import { limitsForTier } from "@/lib/billing/plan-limits";
 import { countReelsThisMonth } from "@/lib/billing/usage";
 import { reelScriptSchema } from "@/lib/agents/reel-script-agent";
-import {
-  REEL_STYLES,
-  REEL_VOICE_GENDERS,
-  REEL_VOICE_TONES,
-  type ReelStyle,
-  type ReelVoiceGender,
-  type ReelVoiceTone,
-} from "@/lib/types";
+import { listHeygenAvatars } from "@/lib/reels/heygen-client";
 
 const VERSION_KEYS = ["versionA", "versionB", "versionC"] as const;
 type VersionKey = (typeof VERSION_KEYS)[number];
@@ -21,30 +14,29 @@ type VersionKey = (typeof VERSION_KEYS)[number];
 function isVersionKey(value: unknown): value is VersionKey {
   return typeof value === "string" && (VERSION_KEYS as readonly string[]).includes(value);
 }
-function isReelStyle(value: unknown): value is ReelStyle {
-  return typeof value === "string" && (REEL_STYLES as readonly string[]).includes(value);
-}
-function isVoiceGender(value: unknown): value is ReelVoiceGender {
-  return typeof value === "string" && (REEL_VOICE_GENDERS as readonly string[]).includes(value);
-}
-function isVoiceTone(value: unknown): value is ReelVoiceTone {
-  return typeof value === "string" && (REEL_VOICE_TONES as readonly string[]).includes(value);
-}
 
 // This is where the monthly Reel quota is actually enforced — picking a
-// version is the step that triggers real vendor spend (voiceover + render),
-// unlike generate-scripts which is cheap LLM-only exploration.
+// version is the step that triggers real vendor spend (the HeyGen avatar
+// render), unlike generate-scripts which is cheap LLM-only exploration.
+// avatarId is validated against the account's live HeyGen avatar list
+// (rather than trusted as-is) so a stale/tampered id can't reach the
+// render call — its defaultVoiceId is captured here too, since HeyGen
+// bundles a cloned voice with each digital-twin avatar.
 export const POST = withAuth<{ params: Promise<{ id: string }> }>(
   async (request, { params, user: currentUser }) => {
     const { id } = await params;
     const body = await request.json().catch(() => null);
     const versionKey = body?.versionKey;
-    const style = body?.style;
-    const voiceGender = body?.voiceGender;
-    const voiceTone = body?.voiceTone;
+    const avatarId = body?.avatarId;
 
-    if (!isVersionKey(versionKey) || !isReelStyle(style) || !isVoiceGender(voiceGender) || !isVoiceTone(voiceTone)) {
-      return NextResponse.json({ error: "Invalid versionKey/style/voiceGender/voiceTone" }, { status: 400 });
+    if (!isVersionKey(versionKey) || typeof avatarId !== "string" || !avatarId) {
+      return NextResponse.json({ error: "Invalid versionKey/avatarId" }, { status: 400 });
+    }
+
+    const avatars = await listHeygenAvatars();
+    const avatar = avatars.find((a) => a.id === avatarId);
+    if (!avatar || !avatar.ready) {
+      return NextResponse.json({ error: "That avatar isn't available right now" }, { status: 400 });
     }
 
     const reel = await prisma.reel.findUnique({ where: { id } });
@@ -74,9 +66,8 @@ export const POST = withAuth<{ params: Promise<{ id: string }> }>(
       where: { id },
       data: {
         status: "RENDERING",
-        style,
-        voiceGender,
-        voiceTone,
+        avatarId: avatar.id,
+        voiceId: avatar.defaultVoiceId,
         script: parsedScript.data,
       },
     });

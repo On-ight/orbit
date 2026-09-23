@@ -19,13 +19,13 @@ export interface ReelGenerationRequestedData {
   reelId: string;
 }
 
-// Sent by app/api/webhooks/creatomate/route.ts once Creatomate's own
-// render-complete callback fires — the reel-pipeline function's
+// Sent by app/api/webhooks/heygen/route.ts once HeyGen's own
+// avatar_video.success/fail callback fires — the reel-pipeline function's
 // step.waitForEvent matches on data.reelId against this event.
-export const CREATOMATE_RENDER_COMPLETED = "creatomate/render.completed" as const;
+export const HEYGEN_VIDEO_COMPLETED = "heygen/video.completed" as const;
 
-export interface CreatomateRenderCompletedData {
+export interface HeygenVideoCompletedData {
   reelId: string;
-  status: string;
-  url: string | null;
+  status: "completed" | "failed";
+  videoUrl: string | null;
 }

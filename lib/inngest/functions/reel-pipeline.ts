@@ -1,25 +1,21 @@
-import { put } from "@vercel/blob";
 import { prisma } from "@/lib/db/prisma";
+import { SITE_URL } from "@/lib/site-url";
 import {
   inngest,
   REEL_GENERATION_REQUESTED,
-  CREATOMATE_RENDER_COMPLETED,
+  HEYGEN_VIDEO_COMPLETED,
   type ReelGenerationRequestedData,
 } from "@/lib/inngest/client";
-import { generateVoiceover } from "@/lib/reels/elevenlabs-client";
-import { getCreatomateTemplateId, buildCreatomateModifications, submitCreatomateRender } from "@/lib/reels/creatomate-client";
+import { submitHeygenVideo } from "@/lib/reels/heygen-client";
 import { generateReelDescriptionAndHashtags, reelScriptSchema } from "@/lib/agents/reel-script-agent";
-import type { ReelStyle, ReelVoiceGender, ReelVoiceTone } from "@/lib/types";
 
 /**
- * Renders one Reel: voiceover (ElevenLabs) -> submit render (Creatomate,
- * webhook-driven completion, not polled) -> wait for the webhook -> write
- * description/hashtags -> create the Approval row. Unlike agent-cycle.ts's
- * independent stages, these steps form a strict dependency chain (each
- * needs the previous to have actually succeeded), so this leans on
- * Inngest's own step-level retries rather than per-stage try/catch — the
- * outer try/catch here exists only to make sure the Reel ends up FAILED in
- * our own DB rather than stuck at RENDERING forever once retries exhaust.
+ * Renders one Reel as an AI-avatar video via HeyGen (avatar + voice +
+ * captions all generated in one call, webhook-driven completion — not
+ * polled) -> wait for the webhook -> write description/hashtags -> create
+ * the Approval row. The outer try/catch exists only to make sure the Reel
+ * ends up FAILED in our own DB rather than stuck at RENDERING forever once
+ * Inngest's own step retries exhaust.
  */
 export const reelPipelineFn = inngest.createFunction(
   {
@@ -33,8 +29,8 @@ export const reelPipelineFn = inngest.createFunction(
 
     const reel = await step.run("load-reel", () => prisma.reel.findUnique({ where: { id: reelId } }));
 
-    if (!reel || !reel.script || !reel.style || !reel.voiceGender || !reel.voiceTone) {
-      throw new Error(`Reel ${reelId} is missing a selected script/style/voice — cannot render.`);
+    if (!reel || !reel.script || !reel.avatarId || !reel.voiceId) {
+      throw new Error(`Reel ${reelId} is missing a selected script/avatar — cannot render.`);
     }
 
     const parsedScript = reelScriptSchema.safeParse(reel.script);
@@ -42,51 +38,33 @@ export const reelPipelineFn = inngest.createFunction(
       throw new Error(`Reel ${reelId}'s stored script failed validation: ${parsedScript.error.message}`);
     }
     const script = parsedScript.data;
-    const style = reel.style as ReelStyle;
-    const voiceGender = reel.voiceGender as ReelVoiceGender;
-    const voiceTone = reel.voiceTone as ReelVoiceTone;
+    const avatarId = reel.avatarId;
+    const voiceId = reel.voiceId;
 
     try {
-      const voiceoverUrl = await step.run("generate-voiceover", async () => {
-        const fullText = [script.hook, ...script.scenes.map((s) => s.text)].join(" ");
-        const audioBuffer = await generateVoiceover(fullText, voiceGender, voiceTone);
-        const blob = await put(`reels/${reelId}/voiceover.mp3`, audioBuffer, {
-          access: "public",
-          contentType: "audio/mpeg",
-          addRandomSuffix: true,
-        });
-        return blob.url;
+      const heygenVideoId = await step.run("submit-avatar-video", () => {
+        // One continuous script for the avatar to deliver as a single take —
+        // reads naturally as hook followed by the rest of the scenes, rather
+        // than a scene-cut composited video.
+        const fullScript = [script.hook, ...script.scenes.map((s) => s.text)].join(" ");
+        const callbackUrl = `${SITE_URL}/api/webhooks/heygen?secret=${process.env.HEYGEN_WEBHOOK_SECRET}`;
+        return submitHeygenVideo({ avatarId, voiceId, script: fullScript, callbackUrl, callbackId: reelId });
       });
 
-      await step.run("submit-render", () => {
-        const templateId = getCreatomateTemplateId(style);
-        const modifications = buildCreatomateModifications({
-          hook: script.hook,
-          scenes: script.scenes,
-          voiceoverUrl,
-        });
-        // No incoming request to derive a base URL from here (this runs in a
-        // background job, not a route handler) — APP_URL is a new required
-        // env var for this feature; VERCEL_URL (Vercel's own auto-populated
-        // deployment hostname) is the fallback so preview deploys work
-        // without configuring it explicitly.
-        const baseUrl = process.env.APP_URL ?? `https://${process.env.VERCEL_URL}`;
-        const webhookUrl = `${baseUrl}/api/webhooks/creatomate?secret=${process.env.CREATOMATE_WEBHOOK_SECRET}`;
-        return submitCreatomateRender({ templateId, modifications, webhookUrl, metadata: reelId });
-      });
+      await step.run("record-video-id", () => prisma.reel.update({ where: { id: reelId }, data: { heygenVideoId } }));
 
-      const webhookEvent = await step.waitForEvent("wait-for-render", {
-        event: CREATOMATE_RENDER_COMPLETED,
+      const webhookEvent = await step.waitForEvent("wait-for-avatar-video", {
+        event: HEYGEN_VIDEO_COMPLETED,
         match: "data.reelId",
         timeout: "10m",
       });
 
-      if (!webhookEvent || webhookEvent.data.status !== "succeeded" || !webhookEvent.data.url) {
+      if (!webhookEvent || webhookEvent.data.status !== "completed" || !webhookEvent.data.videoUrl) {
         await step.run("mark-failed", () => prisma.reel.update({ where: { id: reelId }, data: { status: "FAILED" } }));
         return { reelId, status: "FAILED" as const };
       }
 
-      const videoUrl = webhookEvent.data.url;
+      const videoUrl = webhookEvent.data.videoUrl;
 
       const description = await step.run("generate-description", () =>
         generateReelDescriptionAndHashtags(accountId, script.title, script.hook),

@@ -134,7 +134,7 @@ export function ApprovalCard({
 
       {approval.type === "REEL" && approval.reel?.videoUrl && (
         <div className="mb-3">
-          {/* Captions are burned into the video by the Creatomate template, not a separate track. */}
+          {/* Captions are burned into the video by HeyGen, not a separate track. */}
           <video
             src={approval.reel.videoUrl}
             controls

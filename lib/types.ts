@@ -64,23 +64,6 @@ export const REEL_MODE_LABELS: Record<ReelMode, string> = {
   TREND_STORY: "🔥 Trend / Story",
 };
 
-export const REEL_STYLES = ["PRODUCT", "UGC", "CINEMATIC", "FOUNDER", "MEME"] as const;
-export type ReelStyle = (typeof REEL_STYLES)[number];
-
-export const REEL_STYLE_LABELS: Record<ReelStyle, string> = {
-  PRODUCT: "Product",
-  UGC: "UGC",
-  CINEMATIC: "Cinematic",
-  FOUNDER: "Founder",
-  MEME: "Meme",
-};
-
-export const REEL_VOICE_GENDERS = ["FEMALE", "MALE"] as const;
-export type ReelVoiceGender = (typeof REEL_VOICE_GENDERS)[number];
-
-export const REEL_VOICE_TONES = ["PROFESSIONAL", "ENERGETIC", "CALM", "CONVERSATIONAL"] as const;
-export type ReelVoiceTone = (typeof REEL_VOICE_TONES)[number];
-
 export const REEL_STATUSES = [
   "OPPORTUNITY",
   "SCRIPT_OPTIONS",

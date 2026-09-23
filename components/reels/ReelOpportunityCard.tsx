@@ -2,23 +2,19 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import {
-  REEL_MODES,
-  REEL_MODE_LABELS,
-  REEL_STYLES,
-  REEL_STYLE_LABELS,
-  REEL_VOICE_GENDERS,
-  REEL_VOICE_TONES,
-  type ReelMode,
-  type ReelStyle,
-  type ReelVoiceGender,
-  type ReelVoiceTone,
-} from "@/lib/types";
+import { REEL_MODES, REEL_MODE_LABELS, type ReelMode } from "@/lib/types";
 
 interface TrendSummary {
   id: string;
   topic: string;
   summary: string;
+}
+
+interface HeygenAvatar {
+  id: string;
+  name: string;
+  previewImageUrl: string;
+  ready: boolean;
 }
 
 interface ReelScriptVersion {
@@ -74,15 +70,27 @@ export function ReelOpportunityCard({ trend, disabled }: { trend: TrendSummary; 
   const [reelId, setReelId] = useState<string | null>(null);
   const [versions, setVersions] = useState<Record<VersionKey, ReelScriptVersion> | null>(null);
   const [selectedKey, setSelectedKey] = useState<VersionKey>("versionA");
-  const [style, setStyle] = useState<ReelStyle>("PRODUCT");
-  const [voiceGender, setVoiceGender] = useState<ReelVoiceGender>("FEMALE");
-  const [voiceTone, setVoiceTone] = useState<ReelVoiceTone>("PROFESSIONAL");
+  const [avatars, setAvatars] = useState<HeygenAvatar[] | null>(null);
+  const [avatarsError, setAvatarsError] = useState<string | null>(null);
+  const [selectedAvatarId, setSelectedAvatarId] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/reels/avatars")
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.avatars) throw new Error(data?.error ?? "Failed to load avatars");
+        setAvatars(data.avatars);
+        const firstReady = data.avatars.find((a: HeygenAvatar) => a.ready);
+        if (firstReady) setSelectedAvatarId(firstReady.id);
+      })
+      .catch((err) => setAvatarsError(err instanceof Error ? err.message : String(err)));
   }, []);
 
   function pollStatus(id: string) {
@@ -124,14 +132,14 @@ export function ReelOpportunityCard({ trend, disabled }: { trend: TrendSummary; 
   }
 
   async function handleSelectVersion() {
-    if (!reelId) return;
+    if (!reelId || !selectedAvatarId) return;
     setPhase("selecting");
     setError(null);
     try {
       const res = await fetch(`/api/reels/${reelId}/select-version`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ versionKey: selectedKey, style, voiceGender, voiceTone }),
+        body: JSON.stringify({ versionKey: selectedKey, avatarId: selectedAvatarId }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Failed to start rendering");
@@ -199,36 +207,58 @@ export function ReelOpportunityCard({ trend, disabled }: { trend: TrendSummary; 
           </div>
 
           <div>
-            <p className="mb-1.5 text-xs font-medium text-[var(--text-muted)]">Style</p>
-            <OptionGrid options={REEL_STYLES} labels={REEL_STYLE_LABELS} value={style} onChange={setStyle} />
-          </div>
-
-          <div>
-            <p className="mb-1.5 text-xs font-medium text-[var(--text-muted)]">Voice</p>
-            <div className="flex flex-wrap gap-2">
-              <OptionGrid
-                options={REEL_VOICE_GENDERS}
-                labels={{ FEMALE: "Female", MALE: "Male" }}
-                value={voiceGender}
-                onChange={setVoiceGender}
-              />
-              <OptionGrid
-                options={REEL_VOICE_TONES}
-                labels={{
-                  PROFESSIONAL: "Professional",
-                  ENERGETIC: "Energetic",
-                  CALM: "Calm",
-                  CONVERSATIONAL: "Conversational",
-                }}
-                value={voiceTone}
-                onChange={setVoiceTone}
-              />
-            </div>
+            <p className="mb-1.5 text-xs font-medium text-[var(--text-muted)]">
+              Influencer — who delivers this Reel
+            </p>
+            {avatarsError && (
+              <p className="text-xs text-[var(--status-critical)]">
+                Couldn&apos;t load avatars: {avatarsError}
+              </p>
+            )}
+            {!avatarsError && !avatars && (
+              <p className="text-xs text-[var(--text-muted)]">Loading avatars…</p>
+            )}
+            {avatars && avatars.length === 0 && (
+              <p className="text-xs text-[var(--text-muted)]">
+                No HeyGen avatar configured yet — create a digital twin on your HeyGen account first.
+              </p>
+            )}
+            {avatars && avatars.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {avatars.map((avatar) => (
+                  <button
+                    key={avatar.id}
+                    type="button"
+                    disabled={!avatar.ready}
+                    onClick={() => setSelectedAvatarId(avatar.id)}
+                    title={avatar.ready ? undefined : "Still processing on HeyGen — not ready yet"}
+                    className="flex items-center gap-2 rounded-md border px-2 py-1.5 text-left text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
+                    style={
+                      selectedAvatarId === avatar.id
+                        ? { borderColor: "var(--accent)", background: "var(--accent-soft)", color: "var(--accent)" }
+                        : { borderColor: "var(--border)", color: "var(--text-secondary)" }
+                    }
+                  >
+                    {avatar.previewImageUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={avatar.previewImageUrl}
+                        alt={avatar.name}
+                        className="h-8 w-8 rounded-full border border-[var(--border)] object-cover"
+                      />
+                    )}
+                    {avatar.name}
+                    {!avatar.ready && " (processing)"}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <button
             onClick={handleSelectVersion}
-            className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
+            disabled={!selectedAvatarId}
+            className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Generate Reel
           </button>
@@ -241,7 +271,7 @@ export function ReelOpportunityCard({ trend, disabled }: { trend: TrendSummary; 
 
       {phase === "rendering" && (
         <div className="mt-4 space-y-1 text-sm text-[var(--text-muted)]">
-          <p>✦ Orbit is creating your Reel — this usually takes a couple of minutes.</p>
+          <p>✦ Your AI influencer is filming this Reel — this usually takes a couple of minutes.</p>
         </div>
       )}
 
@@ -256,7 +286,7 @@ export function ReelOpportunityCard({ trend, disabled }: { trend: TrendSummary; 
 
       {phase === "failed" && (
         <p className="mt-4 text-sm text-[var(--status-critical)]">
-          Rendering failed. Try again, or check that your Creatomate/ElevenLabs setup is configured correctly.
+          Rendering failed. Try again, or check that your HeyGen setup is configured correctly.
         </p>
       )}
     </div>
