@@ -65,9 +65,12 @@ export async function discoverTrends(
   const account = await prisma.account.findUnique({ where: { id: accountId } });
   if (!account) return { ok: false, created: 0, error: "Account not found" };
 
-  const kbEntries = await prisma.knowledgeBaseEntry.findMany({
-    where: { accountId, key: { in: ["CONTENT_PILLARS", "SAFETY_RULES"] } },
-  });
+  // No code path in this app ever writes key: "CONTENT_PILLARS" or
+  // "SAFETY_RULES" (those were meant as standard slots, never wired up) — a
+  // key-filtered query here always returned empty regardless of how much
+  // real KB content an account has. Pull everything instead, same as
+  // buildSystemPrompt() in llm-client.ts already does for every other agent.
+  const kbEntries = await prisma.knowledgeBaseEntry.findMany({ where: { accountId } });
   const kbContext = kbEntries.map((e) => `## ${e.title}\n${e.content}`).join("\n\n");
 
   const researchPrompt = `Research current, real, specific news, trends, or stories relevant to
