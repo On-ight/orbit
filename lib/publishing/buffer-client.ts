@@ -128,9 +128,13 @@ export type BufferAsset = { image: { url: string } } | { video: { url: string; t
  * scheduled post can be hours or days later, so a signed/expiring URL will
  * fail silently down the line. instagramType is required alongside any
  * Instagram asset (Buffer's metadata.instagram.type field has no default);
- * firstComment (hashtags) keeps the caption itself clean, matching how
- * Instagram captions are actually written. Throws on failure — callers must
- * not mark anything as published/scheduled unless this resolves successfully.
+ * firstComment (hashtags posted separately from the caption) is a real
+ * Buffer capability, but it's gated behind Buffer's paid plans — on a
+ * free/basic plan Buffer silently drops it rather than posting it, so
+ * callers on such a plan should append hashtags into `content` itself
+ * instead (see app/api/approvals/[id]/route.ts). Throws on failure —
+ * callers must not mark anything as published/scheduled unless this
+ * resolves successfully.
  */
 export async function schedulePostToBuffer(
   accountId: string,

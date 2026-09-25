@@ -19,7 +19,7 @@ const BUFFER_PLATFORMS: BufferPlatform[] = ["X", "THREADS", "LINKEDIN", "INSTAGR
 // prompt already asks for at most 5, this is the hard backstop.
 const MAX_INSTAGRAM_HASHTAGS = 5;
 
-function hashtagsToFirstComment(hashtags: string | null): string | undefined {
+function formatHashtags(hashtags: string | null): string | undefined {
   if (!hashtags) return undefined;
   return hashtags
     .split(",")
@@ -99,11 +99,15 @@ export const PATCH = withAuth<{ params: Promise<{ id: string }> }>(async (reques
     // manual-download behavior instead of erroring.
     let assets: BufferAsset[] | undefined;
     let instagramType: "post" | "reel" | undefined;
-    let firstComment: string | undefined;
+    // Appended into the caption itself, not sent as Buffer's separate
+    // firstComment field — that's a paid-plan-only Buffer feature, and
+    // without it Buffer silently drops the comment rather than posting it,
+    // so the hashtags would never actually appear anywhere.
+    let hashtagsForCaption: string | undefined;
     if (bufferPlatform === "INSTAGRAM" && approval.type === "REEL" && approval.reel?.videoUrl) {
       assets = [{ video: { url: approval.reel.videoUrl } }];
       instagramType = "reel";
-      firstComment = hashtagsToFirstComment(approval.reel.hashtags);
+      hashtagsForCaption = formatHashtags(approval.reel.hashtags);
     } else if (
       bufferPlatform === "INSTAGRAM" &&
       approval.type === "CAROUSEL" &&
@@ -111,10 +115,14 @@ export const PATCH = withAuth<{ params: Promise<{ id: string }> }>(async (reques
     ) {
       assets = (approval.carousel.slideImageUrls as string[]).map((url) => ({ image: { url } }));
       instagramType = "post";
-      firstComment = hashtagsToFirstComment(approval.carousel.hashtags);
+      hashtagsForCaption = formatHashtags(approval.carousel.hashtags);
     } else if (bufferPlatform === "LINKEDIN" && finalImageUrl) {
       assets = [{ image: { url: finalImageUrl } }];
     }
+
+    // Only affects what's actually sent to Buffer — Approval.content/
+    // editedContent in the DB stay as the clean caption on its own.
+    const contentForBuffer = hashtagsForCaption ? `${finalContent}\n\n${hashtagsForCaption}` : finalContent;
 
     const canPublishViaBuffer =
       bufferPlatform === "INSTAGRAM" ? Boolean(assets) : Boolean(bufferPlatform);
@@ -125,11 +133,10 @@ export const PATCH = withAuth<{ params: Promise<{ id: string }> }>(async (reques
       (await isBufferConfiguredForPlatform(currentUser.accountId, bufferPlatform))
     ) {
       try {
-        const result = await schedulePostToBuffer(currentUser.accountId, finalContent, bufferPlatform, {
+        const result = await schedulePostToBuffer(currentUser.accountId, contentForBuffer, bufferPlatform, {
           dueAt: scheduledForInput,
           assets,
           instagramType,
-          firstComment,
         });
         livePublish = {
           publishedVia: "BUFFER",
