@@ -58,6 +58,12 @@ model Account {
   // (discover-mentions.ts) — proactive keyword search, alongside the
   // account's own X mentions timeline which needs no configuration.
   discoveryKeywords    String?
+  // Set right before each Trend Discovery attempt (lib/agents/discover-trends.ts)
+  // regardless of outcome — Groq's browser_search tool has no caller-side cap
+  // on how many pages it reads per call, so a single call's token cost is
+  // unbounded. This is the actual lever available: at most one attempt per
+  // account per calendar day, no matter how many times a cycle is triggered.
+  lastTrendDiscoveryAt DateTime?
 
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt

@@ -158,7 +158,6 @@ export async function callStructuredCompletion<T>(args: StructuredCallArgs<T>): 
 interface WebSearchArgs {
   userMessage: string;
   system: string; // required — callers parameterize this per account, no generic default
-  maxSearches?: number;
 }
 
 /**

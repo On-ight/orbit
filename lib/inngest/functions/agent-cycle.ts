@@ -91,9 +91,11 @@ export const agentCycleFn = inngest.createFunction(
       try {
         const discovery = await step.run("discover-trends", () => discoverTrends(accountId, run.id));
         parts.push(
-          discovery.ok
-            ? `Trend Discovery: ${discovery.created} new trend(s) found`
-            : `Trend Discovery failed: ${discovery.error}`,
+          discovery.skipped
+            ? "Trend Discovery: skipped — already ran today"
+            : discovery.ok
+              ? `Trend Discovery: ${discovery.created} new trend(s) found`
+              : `Trend Discovery failed: ${discovery.error}`,
         );
       } catch (err) {
         hadError = true;

@@ -39,6 +39,7 @@ export interface DiscoverTrendsResult {
   ok: boolean;
   created: number;
   error?: string;
+  skipped?: boolean;
 }
 
 /**
@@ -64,6 +65,19 @@ export async function discoverTrends(
 ): Promise<DiscoverTrendsResult> {
   const account = await prisma.account.findUnique({ where: { id: accountId } });
   if (!account) return { ok: false, created: 0, error: "Account not found" };
+
+  // Groq's browser_search tool has no caller-side cap on how many pages it
+  // reads per call — verified against both Groq's docs and the groq-sdk's own
+  // types, which accept nothing beyond { type: "browser_search" } — so a
+  // single call's token cost is unbounded and can be large. The only lever
+  // available is frequency: at most one attempt per account per calendar
+  // day, no matter how many times a cycle is triggered (including manually).
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  if (account.lastTrendDiscoveryAt && account.lastTrendDiscoveryAt >= startOfToday) {
+    return { ok: true, created: 0, skipped: true };
+  }
+  await prisma.account.update({ where: { id: accountId }, data: { lastTrendDiscoveryAt: new Date() } });
 
   // No code path in this app ever writes key: "CONTENT_PILLARS" or
   // "SAFETY_RULES" (those were meant as standard slots, never wired up) — a
@@ -99,7 +113,6 @@ new or interesting, say so plainly rather than forcing results.`;
     researchText = await researchWithWebSearch({
       userMessage: researchPrompt,
       system: `You are a careful researcher for ${account.name}. You have real-time web search access. Be accurate and specific, and follow the scope and content-policy constraints in the request exactly — do not surface anything outside them even if it seems newsworthy.`,
-      maxSearches: 5,
     });
   } catch (err) {
     return { ok: false, created: 0, error: String(err) };
