@@ -13,11 +13,20 @@ type Action = "approve" | "reject" | "edit";
 
 const BUFFER_PLATFORMS: BufferPlatform[] = ["X", "THREADS", "LINKEDIN", "INSTAGRAM"];
 
+// Capped at 5 regardless of how many are stored — Instagram's algorithm as
+// of 2026 only counts the first ~5 hashtags toward reach (the technical cap
+// is still 30, but more than 5 is just wasted, not rejected). The generation
+// prompt already asks for at most 5, this is the hard backstop.
+const MAX_INSTAGRAM_HASHTAGS = 5;
+
 function hashtagsToFirstComment(hashtags: string | null): string | undefined {
   if (!hashtags) return undefined;
   return hashtags
     .split(",")
-    .map((h) => `#${h.trim()}`)
+    .map((h) => h.trim())
+    .filter(Boolean)
+    .slice(0, MAX_INSTAGRAM_HASHTAGS)
+    .map((h) => `#${h}`)
     .join(" ");
 }
 

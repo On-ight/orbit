@@ -135,13 +135,17 @@ export async function generateReelDescriptionAndHashtags(
       type: "object",
       properties: {
         description: { type: "string", description: "Instagram caption, under 2200 characters" },
-        hashtags: { type: "string", description: "5-10 relevant hashtags, comma-separated, no # symbol" },
+        hashtags: {
+          type: "string",
+          description:
+            "At most 5 relevant hashtags, comma-separated, no # symbol — Instagram's algorithm as of 2026 only counts the first ~5 toward reach, more is just wasted",
+        },
       },
       required: ["description", "hashtags"],
     },
     zodSchema: descriptionSchema,
     system,
-    userMessage: `Write an Instagram caption and hashtags for a Reel titled "${title}" with the hook: "${hook}". Keep the caption on-brand and under 2200 characters. Do not invent facts or claims not already implied by the title/hook.`,
+    userMessage: `Write an Instagram caption and hashtags for a Reel titled "${title}" with the hook: "${hook}". Keep the caption on-brand and under 2200 characters, and use at most 5 hashtags — more doesn't help reach on Instagram's current algorithm. Do not invent facts or claims not already implied by the title/hook.`,
     maxTokens: 512,
   });
 }

@@ -32,6 +32,20 @@ const TYPE_LABEL: Record<string, string> = {
   CAROUSEL: "🎠 Carousel",
 };
 
+// Matches the cap applied when actually publishing (app/api/approvals/[id]/route.ts)
+// — shown here so the card never displays more than what will really post.
+const MAX_INSTAGRAM_HASHTAGS = 5;
+
+function formatHashtags(hashtags: string): string {
+  return hashtags
+    .split(",")
+    .map((h) => h.trim())
+    .filter(Boolean)
+    .slice(0, MAX_INSTAGRAM_HASHTAGS)
+    .map((h) => `#${h}`)
+    .join(" ");
+}
+
 function charLimitFor(platform: string): number {
   if (platform === "INSTAGRAM") return INSTAGRAM_CAPTION_LIMIT;
   return PLATFORM_CHAR_LIMITS[platform as Platform] ?? 280;
@@ -147,7 +161,7 @@ export function ApprovalCard({
             className="max-h-96 w-full rounded-lg border border-[var(--border)] bg-black"
           />
           {approval.reel.hashtags && (
-            <p className="mt-1 text-xs text-[var(--text-muted)]">#{approval.reel.hashtags.split(",").map((h) => h.trim()).join(" #")}</p>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">{formatHashtags(approval.reel.hashtags)}</p>
           )}
         </div>
       )}
@@ -168,7 +182,7 @@ export function ApprovalCard({
             ))}
           </div>
           {approval.carousel.hashtags && (
-            <p className="mt-1 text-xs text-[var(--text-muted)]">#{approval.carousel.hashtags.split(",").map((h) => h.trim()).join(" #")}</p>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">{formatHashtags(approval.carousel.hashtags)}</p>
           )}
         </div>
       )}
