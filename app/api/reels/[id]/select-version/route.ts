@@ -6,6 +6,7 @@ import { inngest, REEL_GENERATION_REQUESTED } from "@/lib/inngest/client";
 import { limitsForTier } from "@/lib/billing/plan-limits";
 import { countReelsThisMonth } from "@/lib/billing/usage";
 import { reelScriptSchema } from "@/lib/agents/reel-script-agent";
+import { friendlyLlmErrorMessage } from "@/lib/agents/llm-client";
 import { listHeygenAvatars } from "@/lib/reels/heygen-client";
 
 const VERSION_KEYS = ["versionA", "versionB", "versionC"] as const;
@@ -33,7 +34,13 @@ export const POST = withAuth<{ params: Promise<{ id: string }> }>(
       return NextResponse.json({ error: "Invalid versionKey/avatarId" }, { status: 400 });
     }
 
-    const avatars = await listHeygenAvatars();
+    let avatars;
+    try {
+      avatars = await listHeygenAvatars();
+    } catch (err) {
+      console.error("listHeygenAvatars failed:", err);
+      return NextResponse.json({ error: friendlyLlmErrorMessage(err) }, { status: 502 });
+    }
     const avatar = avatars.find((a) => a.id === avatarId);
     if (!avatar || !avatar.ready) {
       return NextResponse.json({ error: "That avatar isn't available right now" }, { status: 400 });
@@ -72,10 +79,20 @@ export const POST = withAuth<{ params: Promise<{ id: string }> }>(
       },
     });
 
-    await inngest.send({
-      name: REEL_GENERATION_REQUESTED,
-      data: { accountId: currentUser.accountId, reelId: id },
-    });
+    try {
+      await inngest.send({
+        name: REEL_GENERATION_REQUESTED,
+        data: { accountId: currentUser.accountId, reelId: id },
+      });
+    } catch (err) {
+      // The Reel row was already flipped to RENDERING above — without this,
+      // a failed send here leaves it stuck there forever with no job ever
+      // actually enqueued to move it forward. Revert so it's retriable
+      // instead of silently stranded.
+      console.error("Failed to enqueue REEL_GENERATION_REQUESTED:", err);
+      await prisma.reel.update({ where: { id }, data: { status: "SCRIPT_OPTIONS" } });
+      return NextResponse.json({ error: "Failed to start rendering — try again" }, { status: 502 });
+    }
 
     return NextResponse.json({ enqueued: true });
   },

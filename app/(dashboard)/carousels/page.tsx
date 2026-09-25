@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db/prisma";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { CarouselOpportunityCard } from "@/components/carousels/CarouselOpportunityCard";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { limitsForTier } from "@/lib/billing/plan-limits";
 import { countCarouselsThisMonth } from "@/lib/billing/usage";
 import { REEL_MODE_LABELS, type ReelMode } from "@/lib/types";
@@ -62,11 +63,12 @@ export default async function CarouselsPage() {
         ) : (
           <div className="space-y-4">
             {opportunities.map((trend) => (
-              <CarouselOpportunityCard
-                key={trend.id}
-                trend={{ id: trend.id, topic: trend.topic, summary: trend.summary ?? "" }}
-                disabled={quotaReached}
-              />
+              <ErrorBoundary key={trend.id} label="this Carousel opportunity">
+                <CarouselOpportunityCard
+                  trend={{ id: trend.id, topic: trend.topic, summary: trend.summary ?? "" }}
+                  disabled={quotaReached}
+                />
+              </ErrorBoundary>
             ))}
           </div>
         )}

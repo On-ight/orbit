@@ -27,21 +27,21 @@ export const reelPipelineFn = inngest.createFunction(
   async ({ event, step }) => {
     const { accountId, reelId } = event.data as ReelGenerationRequestedData;
 
-    const reel = await step.run("load-reel", () => prisma.reel.findUnique({ where: { id: reelId } }));
-
-    if (!reel || !reel.script || !reel.avatarId || !reel.voiceId) {
-      throw new Error(`Reel ${reelId} is missing a selected script/avatar — cannot render.`);
-    }
-
-    const parsedScript = reelScriptSchema.safeParse(reel.script);
-    if (!parsedScript.success) {
-      throw new Error(`Reel ${reelId}'s stored script failed validation: ${parsedScript.error.message}`);
-    }
-    const script = parsedScript.data;
-    const avatarId = reel.avatarId;
-    const voiceId = reel.voiceId;
-
     try {
+      const reel = await step.run("load-reel", () => prisma.reel.findUnique({ where: { id: reelId } }));
+
+      if (!reel || !reel.script || !reel.avatarId || !reel.voiceId) {
+        throw new Error(`Reel ${reelId} is missing a selected script/avatar — cannot render.`);
+      }
+
+      const parsedScript = reelScriptSchema.safeParse(reel.script);
+      if (!parsedScript.success) {
+        throw new Error(`Reel ${reelId}'s stored script failed validation: ${parsedScript.error.message}`);
+      }
+      const script = parsedScript.data;
+      const avatarId = reel.avatarId;
+      const voiceId = reel.voiceId;
+
       const heygenVideoId = await step.run("submit-avatar-video", () => {
         // One continuous script for the avatar to deliver as a single take —
         // reads naturally as hook followed by the rest of the scenes, rather

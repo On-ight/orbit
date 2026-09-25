@@ -90,7 +90,10 @@ export function ReelOpportunityCard({ trend, disabled }: { trend: TrendSummary; 
         const firstReady = data.avatars.find((a: HeygenAvatar) => a.ready);
         if (firstReady) setSelectedAvatarId(firstReady.id);
       })
-      .catch((err) => setAvatarsError(err instanceof Error ? err.message : String(err)));
+      .catch((err) => {
+        console.error("Failed to load avatars:", err);
+        setAvatarsError(err instanceof Error ? err.message : String(err));
+      });
   }, []);
 
   function pollStatus(id: string) {
@@ -126,6 +129,7 @@ export function ReelOpportunityCard({ trend, disabled }: { trend: TrendSummary; 
       setVersions(data.versions);
       setPhase("choosing");
     } catch (err) {
+      console.error("generate-scripts failed:", err);
       setError(err instanceof Error ? err.message : String(err));
       setPhase("idle");
     }
@@ -146,6 +150,7 @@ export function ReelOpportunityCard({ trend, disabled }: { trend: TrendSummary; 
       setPhase("rendering");
       pollStatus(reelId);
     } catch (err) {
+      console.error("select-version failed:", err);
       setError(err instanceof Error ? err.message : String(err));
       setPhase("choosing");
     }

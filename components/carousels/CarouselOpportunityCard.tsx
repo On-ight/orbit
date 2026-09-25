@@ -81,6 +81,7 @@ export function CarouselOpportunityCard({ trend, disabled }: { trend: TrendSumma
       setVersions(data.versions);
       setPhase("choosing");
     } catch (err) {
+      console.error("generate-scripts failed:", err);
       setError(err instanceof Error ? err.message : String(err));
       setPhase("idle");
     }
@@ -100,6 +101,7 @@ export function CarouselOpportunityCard({ trend, disabled }: { trend: TrendSumma
       if (!res.ok) throw new Error(data?.error ?? "Failed to render carousel");
       setPhase("ready");
     } catch (err) {
+      console.error("select-version failed:", err);
       setError(err instanceof Error ? err.message : String(err));
       setPhase("failed");
     }

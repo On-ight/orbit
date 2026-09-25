@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db/prisma";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { ReelOpportunityCard } from "@/components/reels/ReelOpportunityCard";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { limitsForTier } from "@/lib/billing/plan-limits";
 import { countReelsThisMonth } from "@/lib/billing/usage";
 import { REEL_MODE_LABELS, type ReelMode } from "@/lib/types";
@@ -64,11 +65,12 @@ export default async function ReelsPage() {
         ) : (
           <div className="space-y-4">
             {opportunities.map((trend) => (
-              <ReelOpportunityCard
-                key={trend.id}
-                trend={{ id: trend.id, topic: trend.topic, summary: trend.summary ?? "" }}
-                disabled={quotaReached}
-              />
+              <ErrorBoundary key={trend.id} label="this Reel opportunity">
+                <ReelOpportunityCard
+                  trend={{ id: trend.id, topic: trend.topic, summary: trend.summary ?? "" }}
+                  disabled={quotaReached}
+                />
+              </ErrorBoundary>
             ))}
           </div>
         )}
