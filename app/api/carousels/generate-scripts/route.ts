@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/auth/with-auth";
 import { reelGenerationLimiter } from "@/lib/redis/rate-limit";
 import { generateCarouselVersions } from "@/lib/agents/carousel-script-agent";
+import { friendlyLlmErrorMessage } from "@/lib/agents/llm-client";
 import { REEL_MODES, type ReelMode } from "@/lib/types";
 
 function isReelMode(value: unknown): value is ReelMode {
@@ -55,7 +56,8 @@ export const POST = withAuth(
       });
       return NextResponse.json(carousel);
     } catch (err) {
-      return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
+      console.error("Carousel script generation failed:", err);
+      return NextResponse.json({ error: friendlyLlmErrorMessage(err) }, { status: 500 });
     }
   },
   { rateLimit: reelGenerationLimiter },

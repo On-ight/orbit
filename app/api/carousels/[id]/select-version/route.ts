@@ -7,6 +7,7 @@ import { limitsForTier } from "@/lib/billing/plan-limits";
 import { countCarouselsThisMonth } from "@/lib/billing/usage";
 import { carouselVersionSchema } from "@/lib/agents/carousel-script-agent";
 import { generateReelDescriptionAndHashtags } from "@/lib/agents/reel-script-agent";
+import { friendlyLlmErrorMessage } from "@/lib/agents/llm-client";
 import { renderCarouselSlides } from "@/lib/carousels/slide-renderer";
 
 // This one request does everything Reels split across an async Inngest
@@ -112,8 +113,9 @@ export const POST = withAuth<{ params: Promise<{ id: string }> }>(
 
       return NextResponse.json({ status: "READY" });
     } catch (err) {
+      console.error("Carousel render failed:", err);
       await prisma.carousel.update({ where: { id }, data: { status: "FAILED" } });
-      return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
+      return NextResponse.json({ error: friendlyLlmErrorMessage(err) }, { status: 500 });
     }
   },
   { rateLimit: reelGenerationLimiter },

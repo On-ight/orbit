@@ -1,4 +1,4 @@
-import Groq from "groq-sdk";
+import Groq, { BadRequestError } from "groq-sdk";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 
@@ -46,22 +46,12 @@ Hard content rules, always in force:
 - Never describe an unlaunched feature, market, or product capability as already live — use
   "we're building" framing for anything not actually shipped, per the business's own product status
   (stated in their own brand context, not assumed).
+- Never write a persuasive or complete draft for anything political or controversial, a complaint,
+  an accusation, or a brand-reputation issue — these are handled by a human directly, not drafted.
 
-You operate under a three-tier autonomy model. You must classify every piece of content
-you are asked to draft or assess into exactly one tier:
-
-- AUTO: safe to act on without human review (trend collection, analysis, categorization,
-  drafting for later human review, analytics).
-- APPROVAL: you may draft it, but a human must approve before it is ever published or sent
-  (posts, replies, community invitations, sensitive conversations).
-- NEVER: you must NOT draft usable content at all. This applies to political or controversial
-  topics, complaints, accusations, brand-reputation issues, unverified safety claims, AND any of
-  the fabricated-number/unverified-claim cases above — a confidently-stated false number is the
-  same failure mode as a confidently-stated false safety claim. For NEVER-tier items, do not
-  write a persuasive or complete draft — simply acknowledge the classification and leave the
-  draft field empty or minimal, because a human will handle it directly.
-
-Always err toward the more conservative tier when uncertain.`;
+Always respond using the tool you're given, not free-form prose — even for a request you'd
+otherwise decline or flag, call the tool with whatever minimal/empty content is appropriate rather
+than explaining in plain text.`;
 
 /**
  * Combines the universal platform-safety rules with this specific account's
@@ -95,6 +85,26 @@ export class LlmRefusalError extends Error {
   }
 }
 
+/**
+ * User-facing routes (e.g. app/api/reels/generate-scripts,
+ * app/api/carousels/generate-scripts) must show this instead of err.message
+ * — Groq's own error bodies (rate-limit text, a link to Groq's own billing
+ * console, occasionally the model's raw failed_generation text) are internal
+ * vendor details a customer should never see directly.
+ */
+export function friendlyLlmErrorMessage(err: unknown): string {
+  if (err instanceof Groq.RateLimitError) {
+    return "AI generation is at capacity right now — try again in a few minutes.";
+  }
+  if (err instanceof LlmRefusalError) {
+    return "The AI couldn't generate this one — try a different topic or angle.";
+  }
+  if (err instanceof Groq.APIError) {
+    return "AI generation failed — try again in a moment.";
+  }
+  return "Something went wrong generating this — try again.";
+}
+
 interface StructuredCallArgs<T> {
   userMessage: string;
   toolName: string;
@@ -118,16 +128,16 @@ interface StructuredCallArgs<T> {
 export async function callStructuredCompletion<T>(args: StructuredCallArgs<T>): Promise<T> {
   const groq = getClient();
 
-  const response = await groq.chat.completions.create({
+  const request = {
     model: LLM_MODEL,
     max_completion_tokens: args.maxTokens ?? 1024,
     messages: [
-      { role: "system", content: args.system },
-      { role: "user", content: args.userMessage },
+      { role: "system" as const, content: args.system },
+      { role: "user" as const, content: args.userMessage },
     ],
     tools: [
       {
-        type: "function",
+        type: "function" as const,
         function: {
           name: args.toolName,
           description: args.toolDescription,
@@ -135,8 +145,25 @@ export async function callStructuredCompletion<T>(args: StructuredCallArgs<T>): 
         },
       },
     ],
-    tool_choice: { type: "function", function: { name: args.toolName } },
-  });
+    tool_choice: { type: "function" as const, function: { name: args.toolName } },
+  };
+
+  let response;
+  try {
+    response = await groq.chat.completions.create(request);
+  } catch (err) {
+    // A forced tool_choice can still fail with a 400 "did not call a tool"
+    // when the model responds in prose instead — probabilistic model
+    // behavior, not a transient infra issue, so retrying the identical
+    // request once is a real (not wasted) second attempt. Excludes
+    // RateLimitError deliberately: retrying an exhausted quota immediately
+    // can't succeed and just wastes the attempt.
+    if (err instanceof BadRequestError) {
+      response = await groq.chat.completions.create(request);
+    } else {
+      throw err;
+    }
+  }
 
   const choice = response.choices[0];
   const toolCall = choice.message.tool_calls?.[0];

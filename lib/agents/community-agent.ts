@@ -79,7 +79,21 @@ export async function runCommunityAgentOnMention(
 
   let analysis: z.infer<typeof analysisSchema>;
   try {
-    const system = await buildSystemPrompt(accountId);
+    // The AUTO/APPROVAL/NEVER framework used to live in the shared
+    // buildSystemPrompt() text, but it was the only thing in that prompt
+    // asking the model to "classify" rather than just fill in a tool's
+    // fields — which made every other structured call (Reel/Carousel
+    // scripts, drafts) more prone to responding with free-form
+    // classification prose instead of complying with the forced tool call.
+    // riskTier is a real field this call's own schema needs filled in
+    // correctly, so the definitions live here, scoped to just this call.
+    const system = `${await buildSystemPrompt(accountId)}
+
+You must also choose a risk tier for the riskTier field: AUTO (safe to send without human
+review), APPROVAL (draft it, but a human must approve before it's sent — the default for an
+ordinary reply), or NEVER (do not draft a usable reply — leave draftReply null; applies to
+anything political, a complaint, an accusation, a brand-reputation issue, or an unverified safety
+claim). Always err toward the more conservative tier when uncertain.`;
     analysis = await callStructuredCompletion({
       toolName: "record_conversation_analysis",
       toolDescription:
