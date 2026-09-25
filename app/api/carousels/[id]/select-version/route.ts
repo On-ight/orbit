@@ -9,12 +9,14 @@ import { carouselVersionSchema } from "@/lib/agents/carousel-script-agent";
 import { generateReelDescriptionAndHashtags } from "@/lib/agents/reel-script-agent";
 import { friendlyLlmErrorMessage } from "@/lib/agents/llm-client";
 import { renderCarouselSlides } from "@/lib/carousels/slide-renderer";
+import { searchUnsplashImage } from "@/lib/carousels/unsplash-client";
 
 // This one request does everything Reels split across an async Inngest
-// pipeline (render + upload + caption LLM call) — comfortably fast, but
-// past Vercel's short default on some plans, so this mirrors the same
-// explicit maxDuration app/api/inngest/route.ts sets for the same reason.
-export const maxDuration = 30;
+// pipeline (render + upload + caption LLM call), plus a round-trip to
+// Unsplash per slide now — comfortably fast, but past Vercel's short
+// default on some plans, so this mirrors the same explicit maxDuration
+// app/api/inngest/route.ts sets for the same reason.
+export const maxDuration = 45;
 
 const VERSION_KEYS = ["versionA", "versionB", "versionC"] as const;
 type VersionKey = (typeof VERSION_KEYS)[number];
@@ -70,7 +72,11 @@ export const POST = withAuth<{ params: Promise<{ id: string }> }>(
     });
 
     try {
-      const pngBuffers = await renderCarouselSlides(script.slides, currentUser.account.name);
+      // One search per slide, in parallel — a missing/failed lookup for any
+      // single slide degrades to that slide's plain gradient look rather
+      // than failing the whole carousel (see searchUnsplashImage's contract).
+      const images = await Promise.all(script.slides.map((slide) => searchUnsplashImage(slide.imageQuery)));
+      const pngBuffers = await renderCarouselSlides(script.slides, currentUser.account.name, images);
       const uploaded = await Promise.all(
         pngBuffers.map((buffer, index) =>
           put(`carousel-${id}-slide-${index + 1}.png`, buffer, {

@@ -49,6 +49,7 @@ Open [http://localhost:3000](http://localhost:3000). You'll be redirected to
 | `NEXT_PUBLIC_SITE_URL` | This app's own canonical public URL (e.g. `https://orbitai.co.in`) — already used for OAuth redirect URIs; the HeyGen webhook callback (built inside a background job, with no incoming request to derive a host from) reuses this same convention rather than a separate variable. Falls back to `http://localhost:3000` if unset. |
 | `HEYGEN_API_KEY` | From a HeyGen account (heygen.com) — generates the AI-avatar Reel videos (avatar, voice, and captions all in one call). Also backs the avatar picker on the Reel-generation flow, which lists the account's own digital-twin avatars live via `GET /v3/avatars/looks` — create at least one digital twin on your HeyGen account before generating a Reel. |
 | `HEYGEN_WEBHOOK_SECRET` | Random string appended to the webhook callback URL as `?secret=` — HeyGen calls this route with no session, so this is the payload-authenticity check. |
+| `UNSPLASH_ACCESS_KEY` | Free Unsplash developer app access key (unsplash.com/developers) — backs Carousel slide background photos. Optional: without it, Carousels still render, just with the plain gradient look instead of a photo per slide. Demo apps are capped at 50 requests/hour. |
 
 ## Connecting Buffer (recommended — covers X, Threads, LinkedIn, and real scheduling)
 

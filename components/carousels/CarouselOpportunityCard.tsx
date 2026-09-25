@@ -13,6 +13,7 @@ interface TrendSummary {
 interface CarouselSlide {
   headline: string;
   body: string;
+  imageQuery: string;
 }
 
 interface CarouselVersion {
