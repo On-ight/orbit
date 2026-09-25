@@ -51,9 +51,11 @@ export const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
 };
 
 // Reels — short-form video. Deliberately NOT added to PLATFORMS: that union
-// doubles as BufferPlatform (lib/publishing/buffer-client.ts), and Buffer
-// has no Instagram support in this app — widening it would misleadingly
-// imply otherwise. Approval.platform for a Reel is just the literal string
+// means "text-post platform" (approval tabs, PLATFORM_CHAR_LIMITS,
+// content-agent.ts's drafting loop), which Instagram never is, even though
+// it's now a real connectable/publishable channel via Buffer
+// (BufferPlatform, lib/publishing/buffer-client.ts, is the wider type for
+// that). Approval.platform for a Reel is just the literal string
 // "INSTAGRAM", an unconstrained DB column, not this shared union.
 export const REEL_MODES = ["PRODUCT_LAUNCH", "EDUCATIONAL", "TREND_STORY"] as const;
 export type ReelMode = (typeof REEL_MODES)[number];

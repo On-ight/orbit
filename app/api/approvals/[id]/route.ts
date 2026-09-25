@@ -4,13 +4,22 @@ import { withAuth } from "@/lib/auth/with-auth";
 import { approvalsLimiter } from "@/lib/redis/rate-limit";
 import {
   BufferPlatform,
+  BufferAsset,
   isBufferConfiguredForPlatform,
   schedulePostToBuffer,
 } from "@/lib/publishing/buffer-client";
 
 type Action = "approve" | "reject" | "edit";
 
-const BUFFER_PLATFORMS: BufferPlatform[] = ["X", "THREADS", "LINKEDIN"];
+const BUFFER_PLATFORMS: BufferPlatform[] = ["X", "THREADS", "LINKEDIN", "INSTAGRAM"];
+
+function hashtagsToFirstComment(hashtags: string | null): string | undefined {
+  if (!hashtags) return undefined;
+  return hashtags
+    .split(",")
+    .map((h) => `#${h.trim()}`)
+    .join(" ");
+}
 
 interface LivePublishResult {
   publishedVia: "BUFFER";
@@ -31,7 +40,13 @@ export const PATCH = withAuth<{ params: Promise<{ id: string }> }>(async (reques
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   }
 
-  const approval = await prisma.approval.findUnique({ where: { id } });
+  const approval = await prisma.approval.findUnique({
+    where: { id },
+    include: {
+      reel: { select: { videoUrl: true, hashtags: true } },
+      carousel: { select: { slideImageUrls: true, hashtags: true } },
+    },
+  });
   // Not found and "belongs to someone else" both come back as 404 — don't
   // reveal that a given id exists under another tenant's account.
   if (!approval || approval.accountId !== currentUser.accountId) {
@@ -68,15 +83,45 @@ export const PATCH = withAuth<{ params: Promise<{ id: string }> }>(async (reques
     let livePublish: LivePublishResult | null = null;
     const bufferPlatform = BUFFER_PLATFORMS.find((p) => p === approval.platform);
 
-    if (bufferPlatform && (await isBufferConfiguredForPlatform(currentUser.accountId, bufferPlatform))) {
+    // Reels/Carousels carry their asset(s) on the linked Reel/Carousel row,
+    // not on the Approval itself — resolved here so a video/image(s) that
+    // isn't actually populated yet (shouldn't happen; these Approval rows
+    // are only created once status: "READY") falls through to the existing
+    // manual-download behavior instead of erroring.
+    let assets: BufferAsset[] | undefined;
+    let instagramType: "post" | "reel" | undefined;
+    let firstComment: string | undefined;
+    if (bufferPlatform === "INSTAGRAM" && approval.type === "REEL" && approval.reel?.videoUrl) {
+      assets = [{ video: { url: approval.reel.videoUrl } }];
+      instagramType = "reel";
+      firstComment = hashtagsToFirstComment(approval.reel.hashtags);
+    } else if (
+      bufferPlatform === "INSTAGRAM" &&
+      approval.type === "CAROUSEL" &&
+      approval.carousel?.slideImageUrls
+    ) {
+      assets = (approval.carousel.slideImageUrls as string[]).map((url) => ({ image: { url } }));
+      instagramType = "post";
+      firstComment = hashtagsToFirstComment(approval.carousel.hashtags);
+    } else if (bufferPlatform === "LINKEDIN" && finalImageUrl) {
+      assets = [{ image: { url: finalImageUrl } }];
+    }
+
+    const canPublishViaBuffer =
+      bufferPlatform === "INSTAGRAM" ? Boolean(assets) : Boolean(bufferPlatform);
+
+    if (
+      bufferPlatform &&
+      canPublishViaBuffer &&
+      (await isBufferConfiguredForPlatform(currentUser.accountId, bufferPlatform))
+    ) {
       try {
-        const result = await schedulePostToBuffer(
-          currentUser.accountId,
-          finalContent,
-          bufferPlatform,
-          scheduledForInput,
-          bufferPlatform === "LINKEDIN" ? finalImageUrl : undefined,
-        );
+        const result = await schedulePostToBuffer(currentUser.accountId, finalContent, bufferPlatform, {
+          dueAt: scheduledForInput,
+          assets,
+          instagramType,
+          firstComment,
+        });
         livePublish = {
           publishedVia: "BUFFER",
           platformPostId: result.bufferPostId,
@@ -126,10 +171,11 @@ export const PATCH = withAuth<{ params: Promise<{ id: string }> }>(async (reques
         },
       });
     }
-    // No live-publish path for Reels — Instagram isn't a Buffer platform, so
-    // bufferPlatform above is always undefined for one and livePublish stays
-    // null. Approving just flips status; the caption/hashtags are already
-    // ready to grab from the card.
+    // Just a status flip either way — the live-publish attempt above (if
+    // Instagram is Buffer-configured) already updated `updated` with
+    // publishedVia/platformPostId; if it's not configured or the asset
+    // wasn't ready, this still marks the Reel/Carousel approved and the
+    // caption/hashtags stay ready to grab from the card manually.
     if (approval.reelId) {
       await prisma.reel.update({ where: { id: approval.reelId }, data: { status: "APPROVED" } });
     }

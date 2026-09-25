@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "buffer:channels": "tsx --env-file=.env.local scripts/list-buffer-channels.ts",
+    "buffer:assign": "tsx --env-file=.env.local scripts/assign-buffer-channel.ts",
     "migrate:founder-firebase": "tsx --env-file=.env.local scripts/migrate-founder-to-firebase.ts",
     "postinstall": "prisma generate",
     "vercel-build": "prisma generate && prisma migrate deploy && next build"

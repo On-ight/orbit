@@ -37,11 +37,13 @@ export function ConnectionsPanel({
   x,
   threads,
   linkedin,
+  instagram,
   notice,
 }: {
   x: XConnection;
   threads: BufferConnection;
   linkedin: BufferConnection;
+  instagram: BufferConnection;
   notice?: { kind: "success" | "error"; message: string } | null;
 }) {
   return (
@@ -65,7 +67,7 @@ export function ConnectionsPanel({
         </div>
       )}
 
-      <div className="grid gap-5 p-6 sm:grid-cols-3">
+      <div className="grid gap-5 p-6 sm:grid-cols-2 lg:grid-cols-4">
         {/* X — direct connect */}
         <div className="flex flex-col rounded-xl border border-[var(--border)] p-5 transition hover:border-[var(--accent)] hover:shadow-sm">
           <div className="flex items-center gap-3">
@@ -134,6 +136,34 @@ export function ConnectionsPanel({
               <p className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
                 <StatusDot ok={linkedin.connected} />
                 {linkedin.connected ? "Connected" : "Not connected"}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 flex-1" />
+
+          <a
+            href={BUFFER_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block rounded-lg border border-[var(--border)] px-4 py-2 text-center text-sm font-medium text-[var(--text-primary)] transition hover:border-[var(--accent)] hover:bg-[var(--surface-2)]"
+          >
+            Connect via Buffer
+          </a>
+          <p className="mt-2 text-center text-[11px] font-medium text-[var(--status-critical)]">
+            Requires a third-party service (Buffer)
+          </p>
+        </div>
+
+        {/* Instagram — via Buffer, for Reels and Carousels */}
+        <div className="flex flex-col rounded-xl border border-[var(--border)] p-5 transition hover:border-[var(--accent)] hover:shadow-sm">
+          <div className="flex items-center gap-3">
+            <Avatar>◎</Avatar>
+            <div className="min-w-0">
+              <p className="font-semibold text-[var(--text-primary)]">Instagram</p>
+              <p className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+                <StatusDot ok={instagram.connected} />
+                {instagram.connected ? "Connected" : "Not connected"}
               </p>
             </div>
           </div>

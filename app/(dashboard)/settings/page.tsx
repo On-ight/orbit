@@ -5,9 +5,11 @@ import { RunHistory } from "@/components/settings/RunHistory";
 import { KnowledgeBaseManager } from "@/components/settings/KnowledgeBaseManager";
 import { ConnectionsPanel } from "@/components/settings/ConnectionsPanel";
 import { AutomationSettings } from "@/components/settings/AutomationSettings";
-import { isBufferConfiguredForPlatform } from "@/lib/publishing/buffer-client";
+import { isBufferConfiguredForPlatform, type BufferPlatform } from "@/lib/publishing/buffer-client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { PLATFORMS } from "@/lib/types";
+
+const CONNECTABLE_PLATFORMS: BufferPlatform[] = [...PLATFORMS, "INSTAGRAM"];
 
 export const dynamic = "force-dynamic";
 
@@ -78,7 +80,7 @@ export default async function SettingsPage({
 
   const [runs, platformConnections, knowledgeBaseEntries, xToken] = await Promise.all([
     prisma.agentRun.findMany({ where: { accountId }, orderBy: { startedAt: "desc" }, take: 10 }),
-    Promise.all(PLATFORMS.map(async (p) => [p, await isBufferConfiguredForPlatform(accountId, p)] as const)),
+    Promise.all(CONNECTABLE_PLATFORMS.map(async (p) => [p, await isBufferConfiguredForPlatform(accountId, p)] as const)),
     prisma.knowledgeBaseEntry.findMany({ where: { accountId }, orderBy: { createdAt: "asc" } }),
     prisma.accountSocialToken.findUnique({ where: { accountId_platform: { accountId, platform: "X" } } }),
   ]);
@@ -103,6 +105,7 @@ export default async function SettingsPage({
           x={{ connected: Boolean(xToken), username: xToken?.externalUsername }}
           threads={{ connected: connectedByPlatform.THREADS }}
           linkedin={{ connected: connectedByPlatform.LINKEDIN }}
+          instagram={{ connected: connectedByPlatform.INSTAGRAM }}
           notice={notice}
         />
       </div>

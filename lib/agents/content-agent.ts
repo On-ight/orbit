@@ -2,8 +2,8 @@ import { z } from "zod";
 import pLimit from "p-limit";
 import { prisma } from "@/lib/db/prisma";
 import { callStructuredCompletion, buildSystemPrompt } from "@/lib/agents/llm-client";
-import { activeBufferPlatforms, isBufferConfigured, BufferPlatform } from "@/lib/publishing/buffer-client";
-import { PLATFORM_CHAR_LIMITS as PLATFORM_LIMITS } from "@/lib/types";
+import { activeBufferPlatforms, isBufferConfigured } from "@/lib/publishing/buffer-client";
+import { PLATFORM_CHAR_LIMITS as PLATFORM_LIMITS, PLATFORMS, type Platform } from "@/lib/types";
 import { limitsForTier } from "@/lib/billing/plan-limits";
 import { countAiGenerationsThisMonth } from "@/lib/billing/usage";
 
@@ -25,7 +25,7 @@ export interface ContentAgentItemResult {
   error?: string;
 }
 
-function platformKey(p: BufferPlatform): string {
+function platformKey(p: Platform): string {
   return p.toLowerCase();
 }
 
@@ -41,8 +41,8 @@ function platformKey(p: BufferPlatform): string {
 async function draftVariantsForTrend(
   accountId: string,
   trend: { topic: string; summary: string },
-  platforms: BufferPlatform[],
-): Promise<{ results: { platform: BufferPlatform; draft: Variant }[]; errors: string[] }> {
+  platforms: Platform[],
+): Promise<{ results: { platform: Platform; draft: Variant }[]; errors: string[] }> {
   const properties: Record<string, unknown> = {};
   const required: string[] = [];
 
@@ -98,7 +98,7 @@ Threads or LinkedIn) is not an invitation to write longer by default, and going 
 platform's draft gets rejected outright and doesn't get published at all.`,
   });
 
-  const results: { platform: BufferPlatform; draft: Variant }[] = [];
+  const results: { platform: Platform; draft: Variant }[] = [];
   const errors: string[] = [];
 
   for (const p of platforms) {
@@ -156,8 +156,13 @@ export async function runContentAgentOnTrend(accountId: string, trendId: string)
   const existingPlatforms = new Set(trend.posts.map((p) => p.platform));
 
   const bufferConfigured = await isBufferConfigured(accountId);
-  const targetPlatforms: BufferPlatform[] = bufferConfigured
-    ? (await activeBufferPlatforms(accountId)).filter((p) => !existingPlatforms.has(p))
+  // activeBufferPlatforms() now legitimately includes "INSTAGRAM" (a real
+  // Buffer-connectable channel, see buffer-client.ts) — filtered out here
+  // since this loop only ever drafts plain text, which Instagram isn't.
+  const targetPlatforms: Platform[] = bufferConfigured
+    ? (await activeBufferPlatforms(accountId)).filter(
+        (p): p is Platform => (PLATFORMS as readonly string[]).includes(p) && !existingPlatforms.has(p),
+      )
     : existingPlatforms.has("X")
       ? []
       : ["X"];

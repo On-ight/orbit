@@ -1,6 +1,6 @@
 // One-off utility: run this after setting BUFFER_API_KEY in .env.local to
-// find the channel ID(s) to put in BUFFER_X_CHANNEL_ID / BUFFER_THREADS_CHANNEL_ID /
-// BUFFER_LINKEDIN_CHANNEL_ID.
+// find each connected channel's id — then assign it to a customer's account
+// via `npm run buffer:assign` (scripts/assign-buffer-channel.ts).
 //
 //   npm run buffer:channels
 
@@ -17,7 +17,7 @@ async function main() {
     console.log(`  ${c.service.padEnd(16)} ${c.name.padEnd(30)} id: ${c.id}`);
   }
   console.log(
-    "\nCopy each id into the matching env var: BUFFER_X_CHANNEL_ID, BUFFER_THREADS_CHANNEL_ID, or BUFFER_LINKEDIN_CHANNEL_ID.",
+    '\nAssign one to a customer account: npm run buffer:assign -- <email> <X|THREADS|LINKEDIN|INSTAGRAM> <id>',
   );
 }
 

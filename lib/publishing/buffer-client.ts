@@ -3,7 +3,12 @@ import { prisma } from "@/lib/db/prisma";
 
 const BUFFER_API_URL = "https://api.buffer.com";
 
-export type BufferPlatform = Platform;
+// Wider than Platform on purpose — Platform means "text-post platform"
+// everywhere else in this codebase (approval tabs, PLATFORM_CHAR_LIMITS,
+// content-agent.ts's drafting loop), and Instagram never drafts as a plain
+// text post. This type exists specifically so Instagram can be a connectable
+// Buffer channel without leaking into any of that.
+export type BufferPlatform = Platform | "INSTAGRAM";
 
 // One shared Orbit-owned Buffer account/API key serves every tenant — each
 // customer's connected channel is manually added to it (see
@@ -108,25 +113,38 @@ export interface ScheduledBufferPost {
   status: "SCHEDULED" | "QUEUED";
 }
 
+// One entry per Buffer AssetInput: exactly one of image or video. Verified
+// against Buffer's published GraphQL docs (developers.buffer.com/examples,
+// /types/InstagramPostMetadataInput.html) — multiple image entries in one
+// post is how a carousel is expressed, there's no separate carousel type.
+export type BufferAsset = { image: { url: string } } | { video: { url: string; thumbnailUrl?: string } };
+
 /**
  * Schedules a post through Buffer on this account's connected channel for
  * the given platform. If dueAt is provided, it's scheduled for that exact
  * time (customScheduled); otherwise it's added to Buffer's queue for the
- * next available slot. imageUrl (LinkedIn only in practice) must be a
- * publicly reachable, non-expiring URL — Buffer fetches it at actual publish
- * time, which for a scheduled post can be hours or days later, so a signed/
- * expiring URL will fail silently down the line. Throws on failure — callers
- * must not mark anything as published/scheduled unless this resolves
- * successfully.
+ * next available slot. Every asset URL must be publicly reachable and
+ * non-expiring — Buffer fetches them at actual publish time, which for a
+ * scheduled post can be hours or days later, so a signed/expiring URL will
+ * fail silently down the line. instagramType is required alongside any
+ * Instagram asset (Buffer's metadata.instagram.type field has no default);
+ * firstComment (hashtags) keeps the caption itself clean, matching how
+ * Instagram captions are actually written. Throws on failure — callers must
+ * not mark anything as published/scheduled unless this resolves successfully.
  */
 export async function schedulePostToBuffer(
   accountId: string,
   content: string,
   platform: BufferPlatform,
-  dueAt?: Date,
-  imageUrl?: string,
+  options?: {
+    dueAt?: Date;
+    assets?: BufferAsset[];
+    instagramType?: "post" | "reel";
+    firstComment?: string;
+  },
 ): Promise<ScheduledBufferPost> {
   const channelId = await getChannelId(accountId, platform);
+  const { dueAt, assets, instagramType, firstComment } = options ?? {};
 
   const input: Record<string, unknown> = {
     text: content,
@@ -135,7 +153,12 @@ export async function schedulePostToBuffer(
     mode: dueAt ? "customScheduled" : "addToQueue",
   };
   if (dueAt) input.dueAt = dueAt.toISOString();
-  if (imageUrl) input.assets = [{ image: { url: imageUrl } }];
+  if (assets && assets.length > 0) input.assets = assets;
+  if (instagramType) {
+    input.metadata = {
+      instagram: { type: instagramType, shouldShareToFeed: true, isAiGenerated: true, firstComment },
+    };
+  }
 
   const data = await bufferGraphQL<{
     createPost: { post?: { id: string }; message?: string };
