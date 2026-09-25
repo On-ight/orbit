@@ -161,6 +161,8 @@ export function ApprovalCard({
                 key={url}
                 src={url}
                 alt={`Slide ${index + 1}`}
+                width={205}
+                height={256}
                 className="h-64 flex-none rounded-lg border border-[var(--border)] object-cover"
               />
             ))}
@@ -217,7 +219,14 @@ export function ApprovalCard({
             <img
               src={imageUrl}
               alt="Attached preview"
-              className="mb-2 max-h-48 rounded-md border border-[var(--border)] object-cover"
+              width={192}
+              height={192}
+              // Fixed square box (not max-h alone) — this is a user-uploaded
+              // image of unknown/variable aspect ratio, so a guessed
+              // width/height pair could still mismatch the real image once
+              // it loads. A fixed box + object-cover never shifts regardless
+              // of what gets uploaded.
+              className="mb-2 h-48 w-48 rounded-md border border-[var(--border)] object-cover"
             />
           )}
           {editing && (

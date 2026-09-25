@@ -249,6 +249,8 @@ export function ReelOpportunityCard({ trend, disabled }: { trend: TrendSummary; 
                       <img
                         src={avatar.previewImageUrl}
                         alt={avatar.name}
+                        width={32}
+                        height={32}
                         className="h-8 w-8 rounded-full border border-[var(--border)] object-cover"
                       />
                     )}

@@ -266,7 +266,7 @@ export default function LandingPage() {
 
           <figure className="mx-auto mt-10 max-w-lg rounded-xl border border-neutral-200 bg-white p-8 text-center shadow-sm">
             {/* eslint-disable-next-line @next/next/no-img-element -- small static logo, not worth next/image's overhead here */}
-            <img src="/onsight_logo.jpeg" alt="OnSight" className="mx-auto h-8 w-auto" />
+            <img src="/onsight_logo.jpeg" alt="OnSight" width={117} height={32} className="mx-auto h-8 w-auto" />
             <p className="mt-3 text-xs font-medium uppercase tracking-wide text-neutral-500">
               Travel technology · India
             </p>
