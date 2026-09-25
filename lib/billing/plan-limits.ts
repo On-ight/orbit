@@ -19,7 +19,14 @@ export interface PlanLimits {
 }
 
 export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
-  FREE: { aiGenerationsPerMonth: 10, trendResearch: false, replyDrafting: false, reelsPerMonth: 0, carouselsPerMonth: 3 },
+  // trendResearch is on for Free too: the cron trigger only ever picks up
+  // subscriptionStatus: "active" accounts (app/api/cron/agent-cycle/route.ts),
+  // so a trial account can never get automatic/daily cycles regardless of
+  // this flag — the only way Free runs a cycle at all is the manual button,
+  // which already bounds exposure the same way aiGenerationsPerMonth does.
+  // Without this, Free's Reel/Carousel opportunity feed can never populate
+  // during the trial, since nothing else creates TrendInput rows.
+  FREE: { aiGenerationsPerMonth: 10, trendResearch: true, replyDrafting: false, reelsPerMonth: 0, carouselsPerMonth: 3 },
   BUILDER: { aiGenerationsPerMonth: 100, trendResearch: true, replyDrafting: true, reelsPerMonth: 5, carouselsPerMonth: 15 },
   GROWTH: { aiGenerationsPerMonth: null, trendResearch: true, replyDrafting: true, reelsPerMonth: 20, carouselsPerMonth: 50 },
   AGENCY: { aiGenerationsPerMonth: null, trendResearch: true, replyDrafting: true, reelsPerMonth: 100, carouselsPerMonth: 200 },
