@@ -74,6 +74,7 @@ model Account {
   trendInputs          TrendInput[]
   knowledgeBaseEntries KnowledgeBaseEntry[]
   reels                Reel[]
+  carousels            Carousel[]
 }
 
 model User {
@@ -230,7 +231,7 @@ model Approval {
   accountId      String
   account        Account  @relation(fields: [accountId], references: [id])
 
-  type           String   // POST | REPLY | COMMUNITY_INVITE | REEL
+  type           String   // POST | REPLY | COMMUNITY_INVITE | REEL | CAROUSEL
   status         String   @default("PENDING") // PENDING | APPROVED | REJECTED | EDITED
   platform       String   @default("X")
 
@@ -246,6 +247,8 @@ model Approval {
   post           Post?    @relation(fields: [postId], references: [id])
   reelId         String?
   reel           Reel?    @relation(fields: [reelId], references: [id])
+  carouselId     String?
+  carousel       Carousel? @relation(fields: [carouselId], references: [id])
 
   // Set when this approval was published directly (not via a linked Post) —
   // currently REPLY approvals published through Buffer, which schedules a
@@ -318,6 +321,7 @@ model TrendInput {
 
   posts           Post[]
   reels           Reel[]
+  carousels       Carousel[]
 
   @@unique([accountId, dedupeKey])
   @@index([accountId])
@@ -359,6 +363,42 @@ model Reel {
   // kept for support/debugging; correlation with the webhook actually
   // happens via callback_id (this row's own id), not this field.
   heygenVideoId      String?
+
+  sourceTrendId      String?
+  sourceTrend        TrendInput? @relation(fields: [sourceTrendId], references: [id])
+
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  approvals          Approval[]
+
+  @@index([accountId, status])
+}
+
+model Carousel {
+  id                 String    @id @default(cuid())
+  accountId          String
+  account            Account   @relation(fields: [accountId], references: [id])
+
+  mode               String    // PRODUCT_LAUNCH | EDUCATIONAL | TREND_STORY — same meaning as Reel.mode
+  // SCRIPT_OPTIONS | RENDERING | READY | FAILED | APPROVED | REJECTED
+  status             String    @default("SCRIPT_OPTIONS")
+
+  title              String?
+  // 3 generated slide-copy options (versionA/B/C, each 6 slides), produced
+  // once by carousel-script-agent.ts.
+  versions           Json?
+  selectedVersionIndex Int?
+  // The chosen version's 6 slides, copied out of `versions` at
+  // select-version time — same pattern as Reel.script.
+  slides             Json?
+  // 6 Vercel Blob URLs (public PNGs), populated once rendering finishes.
+  // Rendering itself is synchronous (next/og ImageResponse, no vendor
+  // webhook), so this and `status: READY` are set in the same request that
+  // selects a version — unlike Reel, there's no separate async pipeline.
+  slideImageUrls     Json?
+  description        String?
+  hashtags           String?   // comma-separated, matches Reel.hashtags convention
 
   sourceTrendId      String?
   sourceTrend        TrendInput? @relation(fields: [sourceTrendId], references: [id])

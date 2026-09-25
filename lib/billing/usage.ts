@@ -29,3 +29,14 @@ export async function countReelsThisMonth(accountId: string): Promise<number> {
 
   return prisma.approval.count({ where: { accountId, type: "REEL", createdAt: { gte: startOfMonth } } });
 }
+
+// Counted separately from Reels — Carousels render via next/og in-process
+// (no per-unit vendor cost like HeyGen's avatar render), so this cap exists
+// to bound LLM-call volume, not vendor spend, and can be more generous.
+export async function countCarouselsThisMonth(accountId: string): Promise<number> {
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+
+  return prisma.approval.count({ where: { accountId, type: "CAROUSEL", createdAt: { gte: startOfMonth } } });
+}

@@ -133,6 +133,9 @@ export const PATCH = withAuth<{ params: Promise<{ id: string }> }>(async (reques
     if (approval.reelId) {
       await prisma.reel.update({ where: { id: approval.reelId }, data: { status: "APPROVED" } });
     }
+    if (approval.carouselId) {
+      await prisma.carousel.update({ where: { id: approval.carouselId }, data: { status: "APPROVED" } });
+    }
 
     return NextResponse.json(updated);
   }
@@ -151,6 +154,9 @@ export const PATCH = withAuth<{ params: Promise<{ id: string }> }>(async (reques
   }
   if (approval.reelId) {
     await prisma.reel.update({ where: { id: approval.reelId }, data: { status: "REJECTED" } });
+  }
+  if (approval.carouselId) {
+    await prisma.carousel.update({ where: { id: approval.carouselId }, data: { status: "REJECTED" } });
   }
 
   return NextResponse.json(updated);

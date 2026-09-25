@@ -60,6 +60,15 @@ function ReelsIcon() {
   );
 }
 
+function CarouselsIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <rect x="1" y="3" width="8" height="10" rx="1.3" stroke="currentColor" strokeWidth="1.4" />
+      <rect x="7.5" y="5" width="7.5" height="8" rx="1.3" stroke="currentColor" strokeWidth="1.4" fill="var(--surface-1)" />
+    </svg>
+  );
+}
+
 function SettingsIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -80,6 +89,7 @@ const NAV_ITEMS = [
   { href: "/conversations", label: "Conversations", icon: ConversationsIcon },
   { href: "/content", label: "Content", icon: ContentIcon },
   { href: "/reels", label: "Reels", icon: ReelsIcon },
+  { href: "/carousels", label: "Carousels", icon: CarouselsIcon },
   { href: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 

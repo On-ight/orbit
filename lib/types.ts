@@ -7,7 +7,7 @@ export type IntentLevel = (typeof INTENT_LEVELS)[number];
 export const CONVERSATION_STATUSES = ["NEW", "DRAFTED", "REPLIED", "IGNORED"] as const;
 export type ConversationStatus = (typeof CONVERSATION_STATUSES)[number];
 
-export const APPROVAL_TYPES = ["POST", "REPLY", "COMMUNITY_INVITE", "REEL"] as const;
+export const APPROVAL_TYPES = ["POST", "REPLY", "COMMUNITY_INVITE", "REEL", "CAROUSEL"] as const;
 export type ApprovalType = (typeof APPROVAL_TYPES)[number];
 
 export const APPROVAL_STATUSES = ["PENDING", "APPROVED", "REJECTED", "EDITED"] as const;

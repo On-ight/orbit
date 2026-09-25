@@ -12,13 +12,17 @@ export interface PlanLimits {
   // text generations — kept as its own hard cap, never unlimited, per the
   // explicit warning that unlimited AI video would destroy margins.
   reelsPerMonth: number;
+  // Carousels render via next/og in-process (no vendor render cost like
+  // Reels), so this cap only bounds LLM-call volume — meaningfully more
+  // generous than reelsPerMonth at every tier.
+  carouselsPerMonth: number;
 }
 
 export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
-  FREE: { aiGenerationsPerMonth: 10, trendResearch: false, replyDrafting: false, reelsPerMonth: 0 },
-  BUILDER: { aiGenerationsPerMonth: 100, trendResearch: true, replyDrafting: true, reelsPerMonth: 5 },
-  GROWTH: { aiGenerationsPerMonth: null, trendResearch: true, replyDrafting: true, reelsPerMonth: 20 },
-  AGENCY: { aiGenerationsPerMonth: null, trendResearch: true, replyDrafting: true, reelsPerMonth: 100 },
+  FREE: { aiGenerationsPerMonth: 10, trendResearch: false, replyDrafting: false, reelsPerMonth: 0, carouselsPerMonth: 3 },
+  BUILDER: { aiGenerationsPerMonth: 100, trendResearch: true, replyDrafting: true, reelsPerMonth: 5, carouselsPerMonth: 15 },
+  GROWTH: { aiGenerationsPerMonth: null, trendResearch: true, replyDrafting: true, reelsPerMonth: 20, carouselsPerMonth: 50 },
+  AGENCY: { aiGenerationsPerMonth: null, trendResearch: true, replyDrafting: true, reelsPerMonth: 100, carouselsPerMonth: 200 },
 };
 
 export function limitsForTier(tier: string | null): PlanLimits {

@@ -35,6 +35,7 @@ export default async function ApprovalsPage({
     include: {
       conversation: { select: { authorHandle: true, originalText: true } },
       reel: { select: { videoUrl: true, hashtags: true } },
+      carousel: { select: { slideImageUrls: true, hashtags: true } },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -88,6 +89,12 @@ export default async function ApprovalsPage({
             approval={{
               ...approval,
               createdAt: approval.createdAt.toISOString(),
+              // slideImageUrls is a Json column — always written as string[]
+              // by app/api/carousels/[id]/select-version/route.ts, cast here
+              // rather than widened to Prisma.JsonValue throughout the UI.
+              carousel: approval.carousel
+                ? { slideImageUrls: approval.carousel.slideImageUrls as string[] | null, hashtags: approval.carousel.hashtags }
+                : null,
             }}
           />
         ))}

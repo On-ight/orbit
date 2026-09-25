@@ -20,6 +20,8 @@ export interface ApprovalCardData {
   conversation: { authorHandle: string; originalText: string } | null;
   // Reel-only — null for every other approval type.
   reel: { videoUrl: string | null; hashtags: string | null } | null;
+  // Carousel-only — null for every other approval type.
+  carousel: { slideImageUrls: string[] | null; hashtags: string | null } | null;
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -27,6 +29,7 @@ const TYPE_LABEL: Record<string, string> = {
   REPLY: "💬 Reply",
   COMMUNITY_INVITE: "🤝 Community invite",
   REEL: "🎬 Reel",
+  CAROUSEL: "🎠 Carousel",
 };
 
 function charLimitFor(platform: string): number {
@@ -115,6 +118,9 @@ export function ApprovalCard({
     if (approval.type === "REEL") {
       return "Orbit doesn't publish to Instagram automatically yet — approving marks this ready, then download the video and post it yourself.";
     }
+    if (approval.type === "CAROUSEL") {
+      return "Orbit doesn't publish to Instagram automatically yet — approving marks this ready, then download the slides and post them yourself.";
+    }
     return "No publishing connection configured for this platform — approving this will only mark it published in the demo pipeline.";
   }
 
@@ -142,6 +148,25 @@ export function ApprovalCard({
           />
           {approval.reel.hashtags && (
             <p className="mt-1 text-xs text-[var(--text-muted)]">#{approval.reel.hashtags.split(",").map((h) => h.trim()).join(" #")}</p>
+          )}
+        </div>
+      )}
+
+      {approval.type === "CAROUSEL" && approval.carousel?.slideImageUrls && (
+        <div className="mb-3">
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {approval.carousel.slideImageUrls.map((url, index) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={url}
+                src={url}
+                alt={`Slide ${index + 1}`}
+                className="h-64 flex-none rounded-lg border border-[var(--border)] object-cover"
+              />
+            ))}
+          </div>
+          {approval.carousel.hashtags && (
+            <p className="mt-1 text-xs text-[var(--text-muted)]">#{approval.carousel.hashtags.split(",").map((h) => h.trim()).join(" #")}</p>
           )}
         </div>
       )}

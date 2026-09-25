@@ -24,6 +24,11 @@ function reelsLine(tier: PlanTier): string {
   return limit === 0 ? "No AI Reels" : `${limit} AI Reels / month`;
 }
 
+function carouselsLine(tier: PlanTier): string {
+  const limit = PLAN_LIMITS[tier].carouselsPerMonth;
+  return `${limit} AI Carousels / month`;
+}
+
 const TIERS: { tier: PlanTier; name: string; audience: string; features: string[]; mostPopular?: boolean }[] = [
   {
     tier: "FREE",
@@ -36,6 +41,7 @@ const TIERS: { tier: PlanTier; name: string; audience: string; features: string[
       "Full approval queue — Auto / Approval / Never",
       "Manual publishing — you approve and publish every post",
       reelsLine("FREE"),
+      carouselsLine("FREE"),
       "No credit card required",
     ],
   },
@@ -50,6 +56,7 @@ const TIERS: { tier: PlanTier; name: string; audience: string; features: string[
       "Auto-publish for low-risk (Auto-tier) content",
       "Reply drafting for mentions",
       reelsLine("BUILDER"),
+      carouselsLine("BUILDER"),
     ],
   },
   {
@@ -61,6 +68,7 @@ const TIERS: { tier: PlanTier; name: string; audience: string; features: string[
       "Everything in Builder",
       generationsLine("GROWTH"),
       reelsLine("GROWTH"),
+      carouselsLine("GROWTH"),
       "Priority support",
     ],
   },
@@ -72,6 +80,7 @@ const TIERS: { tier: PlanTier; name: string; audience: string; features: string[
       "Everything in Growth",
       generationsLine("AGENCY"),
       reelsLine("AGENCY"),
+      carouselsLine("AGENCY"),
       "Dedicated priority support & onboarding help",
     ],
   },
