@@ -15,6 +15,12 @@ export const xCallbackLimiter = new Ratelimit({
   prefix: "ratelimit:x-callback",
 });
 
+export const instagramCallbackLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(20, "60 s"),
+  prefix: "ratelimit:instagram-callback",
+});
+
 export const agentsRunLimiter = new Ratelimit({
   redis,
   limiter: Ratelimit.slidingWindow(1, "300 s"),

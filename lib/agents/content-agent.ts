@@ -3,7 +3,7 @@ import pLimit from "p-limit";
 import { prisma } from "@/lib/db/prisma";
 import { callStructuredCompletion, buildSystemPrompt } from "@/lib/agents/llm-client";
 import { activeBufferPlatforms, isBufferConfigured } from "@/lib/publishing/buffer-client";
-import { PLATFORM_CHAR_LIMITS as PLATFORM_LIMITS, PLATFORMS, type Platform } from "@/lib/types";
+import { PLATFORM_CHAR_LIMITS as PLATFORM_LIMITS, type Platform } from "@/lib/types";
 import { limitsForTier } from "@/lib/billing/plan-limits";
 import { countAiGenerationsThisMonth } from "@/lib/billing/usage";
 
@@ -156,13 +156,8 @@ export async function runContentAgentOnTrend(accountId: string, trendId: string)
   const existingPlatforms = new Set(trend.posts.map((p) => p.platform));
 
   const bufferConfigured = await isBufferConfigured(accountId);
-  // activeBufferPlatforms() now legitimately includes "INSTAGRAM" (a real
-  // Buffer-connectable channel, see buffer-client.ts) — filtered out here
-  // since this loop only ever drafts plain text, which Instagram isn't.
   const targetPlatforms: Platform[] = bufferConfigured
-    ? (await activeBufferPlatforms(accountId)).filter(
-        (p): p is Platform => (PLATFORMS as readonly string[]).includes(p) && !existingPlatforms.has(p),
-      )
+    ? (await activeBufferPlatforms(accountId)).filter((p) => !existingPlatforms.has(p))
     : existingPlatforms.has("X")
       ? []
       : ["X"];

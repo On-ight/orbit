@@ -2,33 +2,16 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/auth/with-auth";
 import { approvalsLimiter } from "@/lib/redis/rate-limit";
-import {
-  BufferPlatform,
-  BufferAsset,
-  isBufferConfiguredForPlatform,
-  schedulePostToBuffer,
-} from "@/lib/publishing/buffer-client";
+import { BufferPlatform, BufferAsset, isBufferConfiguredForPlatform, schedulePostToBuffer } from "@/lib/publishing/buffer-client";
+import { isInstagramConnected } from "@/lib/publishing/instagram-client";
+import { inngest, INSTAGRAM_PUBLISH_REQUESTED } from "@/lib/inngest/client";
 
 type Action = "approve" | "reject" | "edit";
 
-const BUFFER_PLATFORMS: BufferPlatform[] = ["X", "THREADS", "LINKEDIN", "INSTAGRAM"];
-
-// Capped at 5 regardless of how many are stored — Instagram's algorithm as
-// of 2026 only counts the first ~5 hashtags toward reach (the technical cap
-// is still 30, but more than 5 is just wasted, not rejected). The generation
-// prompt already asks for at most 5, this is the hard backstop.
-const MAX_INSTAGRAM_HASHTAGS = 5;
-
-function formatHashtags(hashtags: string | null): string | undefined {
-  if (!hashtags) return undefined;
-  return hashtags
-    .split(",")
-    .map((h) => h.trim())
-    .filter(Boolean)
-    .slice(0, MAX_INSTAGRAM_HASHTAGS)
-    .map((h) => `#${h}`)
-    .join(" ");
-}
+// Instagram publishes directly via Meta's API now (lib/publishing/
+// instagram-client.ts + lib/inngest/functions/instagram-publish.ts) — Buffer
+// only covers X/Threads/LinkedIn.
+const BUFFER_PLATFORMS: BufferPlatform[] = ["X", "THREADS", "LINKEDIN"];
 
 interface LivePublishResult {
   publishedVia: "BUFFER";
@@ -92,51 +75,17 @@ export const PATCH = withAuth<{ params: Promise<{ id: string }> }>(async (reques
     let livePublish: LivePublishResult | null = null;
     const bufferPlatform = BUFFER_PLATFORMS.find((p) => p === approval.platform);
 
-    // Reels/Carousels carry their asset(s) on the linked Reel/Carousel row,
-    // not on the Approval itself — resolved here so a video/image(s) that
-    // isn't actually populated yet (shouldn't happen; these Approval rows
-    // are only created once status: "READY") falls through to the existing
-    // manual-download behavior instead of erroring.
-    let assets: BufferAsset[] | undefined;
-    let instagramType: "post" | "reel" | undefined;
-    // Appended into the caption itself, not sent as Buffer's separate
-    // firstComment field — that's a paid-plan-only Buffer feature, and
-    // without it Buffer silently drops the comment rather than posting it,
-    // so the hashtags would never actually appear anywhere.
-    let hashtagsForCaption: string | undefined;
-    if (bufferPlatform === "INSTAGRAM" && approval.type === "REEL" && approval.reel?.videoUrl) {
-      assets = [{ video: { url: approval.reel.videoUrl } }];
-      instagramType = "reel";
-      hashtagsForCaption = formatHashtags(approval.reel.hashtags);
-    } else if (
-      bufferPlatform === "INSTAGRAM" &&
-      approval.type === "CAROUSEL" &&
-      approval.carousel?.slideImageUrls
-    ) {
-      assets = (approval.carousel.slideImageUrls as string[]).map((url) => ({ image: { url } }));
-      instagramType = "post";
-      hashtagsForCaption = formatHashtags(approval.carousel.hashtags);
-    } else if (bufferPlatform === "LINKEDIN" && finalImageUrl) {
-      assets = [{ image: { url: finalImageUrl } }];
-    }
-
-    // Only affects what's actually sent to Buffer — Approval.content/
-    // editedContent in the DB stay as the clean caption on its own.
-    const contentForBuffer = hashtagsForCaption ? `${finalContent}\n\n${hashtagsForCaption}` : finalContent;
-
-    const canPublishViaBuffer =
-      bufferPlatform === "INSTAGRAM" ? Boolean(assets) : Boolean(bufferPlatform);
+    const assets: BufferAsset[] | undefined =
+      bufferPlatform === "LINKEDIN" && finalImageUrl ? [{ image: { url: finalImageUrl } }] : undefined;
 
     if (
       bufferPlatform &&
-      canPublishViaBuffer &&
       (await isBufferConfiguredForPlatform(currentUser.accountId, bufferPlatform))
     ) {
       try {
-        const result = await schedulePostToBuffer(currentUser.accountId, contentForBuffer, bufferPlatform, {
+        const result = await schedulePostToBuffer(currentUser.accountId, finalContent, bufferPlatform, {
           dueAt: scheduledForInput,
           assets,
-          instagramType,
         });
         livePublish = {
           publishedVia: "BUFFER",
@@ -150,6 +99,19 @@ export const PATCH = withAuth<{ params: Promise<{ id: string }> }>(async (reques
           { status: 502 },
         );
       }
+    }
+
+    // Instagram Reels/Carousels publish directly via Meta's API instead —
+    // Meta's own container-processing + publish round-trip can take minutes
+    // (their guidance: poll up to 5 minutes), so this is an async Inngest
+    // job rather than a synchronous call like Buffer's. publishedVia/
+    // platformPostId/publishedUrl populate later once that job finishes,
+    // same eventually-consistent pattern Reel rendering itself already uses.
+    if (approval.platform === "INSTAGRAM" && (await isInstagramConnected(currentUser.accountId))) {
+      await inngest.send({
+        name: INSTAGRAM_PUBLISH_REQUESTED,
+        data: { accountId: currentUser.accountId, approvalId: id },
+      });
     }
 
     const updated = await prisma.approval.update({
@@ -187,11 +149,10 @@ export const PATCH = withAuth<{ params: Promise<{ id: string }> }>(async (reques
         },
       });
     }
-    // Just a status flip either way — the live-publish attempt above (if
-    // Instagram is Buffer-configured) already updated `updated` with
-    // publishedVia/platformPostId; if it's not configured or the asset
-    // wasn't ready, this still marks the Reel/Carousel approved and the
-    // caption/hashtags stay ready to grab from the card manually.
+    // Just a status flip either way — if Instagram isn't connected, this
+    // still marks the Reel/Carousel approved and the caption/hashtags stay
+    // ready to grab from the card manually; if it is connected, the Inngest
+    // job enqueued above updates publishedVia/platformPostId once it finishes.
     if (approval.reelId) {
       await prisma.reel.update({ where: { id: approval.reelId }, data: { status: "APPROVED" } });
     }

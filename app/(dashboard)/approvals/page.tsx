@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db/prisma";
 import { ApprovalCard } from "@/components/approvals/ApprovalCard";
 import { activeBufferPlatforms } from "@/lib/publishing/buffer-client";
+import { isInstagramConnected } from "@/lib/publishing/instagram-client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { PLATFORMS, Platform } from "@/lib/types";
 
@@ -40,7 +41,10 @@ export default async function ApprovalsPage({
     orderBy: { createdAt: "desc" },
   });
 
-  const bufferPlatforms = await activeBufferPlatforms(currentUser.accountId);
+  const [bufferPlatforms, instagramConnected] = await Promise.all([
+    activeBufferPlatforms(currentUser.accountId),
+    isInstagramConnected(currentUser.accountId),
+  ]);
 
   return (
     <div>
@@ -86,6 +90,7 @@ export default async function ApprovalsPage({
           <ApprovalCard
             key={approval.id}
             bufferPlatforms={bufferPlatforms}
+            instagramConnected={instagramConnected}
             approval={{
               ...approval,
               createdAt: approval.createdAt.toISOString(),

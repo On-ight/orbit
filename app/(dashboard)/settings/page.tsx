@@ -5,11 +5,9 @@ import { RunHistory } from "@/components/settings/RunHistory";
 import { KnowledgeBaseManager } from "@/components/settings/KnowledgeBaseManager";
 import { ConnectionsPanel } from "@/components/settings/ConnectionsPanel";
 import { AutomationSettings } from "@/components/settings/AutomationSettings";
-import { isBufferConfiguredForPlatform, type BufferPlatform } from "@/lib/publishing/buffer-client";
+import { isBufferConfiguredForPlatform } from "@/lib/publishing/buffer-client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { PLATFORMS } from "@/lib/types";
-
-const CONNECTABLE_PLATFORMS: BufferPlatform[] = [...PLATFORMS, "INSTAGRAM"];
 
 export const dynamic = "force-dynamic";
 
@@ -69,6 +67,13 @@ function xErrorMessage(code: string): string {
   return "Couldn't connect X — try again, or contact support if it keeps happening.";
 }
 
+function instagramErrorMessage(code: string): string {
+  if (code === "not_configured") return "Instagram isn't configured yet — contact support.";
+  if (code === "missing_params" || code === "expired") return "That connection link expired — try again.";
+  if (code === "token_mismatch") return "Something didn't match up — try connecting again.";
+  return "Couldn't connect Instagram — try again, or contact support if it keeps happening.";
+}
+
 export default async function SettingsPage({
   searchParams,
 }: {
@@ -78,11 +83,12 @@ export default async function SettingsPage({
   const { accountId } = currentUser;
   const params = await searchParams;
 
-  const [runs, platformConnections, knowledgeBaseEntries, xToken] = await Promise.all([
+  const [runs, platformConnections, knowledgeBaseEntries, xToken, instagramToken] = await Promise.all([
     prisma.agentRun.findMany({ where: { accountId }, orderBy: { startedAt: "desc" }, take: 10 }),
-    Promise.all(CONNECTABLE_PLATFORMS.map(async (p) => [p, await isBufferConfiguredForPlatform(accountId, p)] as const)),
+    Promise.all(PLATFORMS.map(async (p) => [p, await isBufferConfiguredForPlatform(accountId, p)] as const)),
     prisma.knowledgeBaseEntry.findMany({ where: { accountId }, orderBy: { createdAt: "asc" } }),
     prisma.accountSocialToken.findUnique({ where: { accountId_platform: { accountId, platform: "X" } } }),
+    prisma.accountSocialToken.findUnique({ where: { accountId_platform: { accountId, platform: "INSTAGRAM" } } }),
   ]);
 
   const connectedByPlatform = Object.fromEntries(platformConnections);
@@ -94,6 +100,15 @@ export default async function SettingsPage({
     notice = { kind: "success", message: "X disconnected." };
   } else if (typeof params.x_error === "string") {
     notice = { kind: "error", message: xErrorMessage(params.x_error) };
+  } else if (params.instagram_connected) {
+    notice = {
+      kind: "success",
+      message: `Connected as @${instagramToken?.externalUsername ?? "your account"}.`,
+    };
+  } else if (params.instagram_disconnected) {
+    notice = { kind: "success", message: "Instagram disconnected." };
+  } else if (typeof params.instagram_error === "string") {
+    notice = { kind: "error", message: instagramErrorMessage(params.instagram_error) };
   }
 
   return (
@@ -105,7 +120,7 @@ export default async function SettingsPage({
           x={{ connected: Boolean(xToken), username: xToken?.externalUsername }}
           threads={{ connected: connectedByPlatform.THREADS }}
           linkedin={{ connected: connectedByPlatform.LINKEDIN }}
-          instagram={{ connected: connectedByPlatform.INSTAGRAM }}
+          instagram={{ connected: Boolean(instagramToken), username: instagramToken?.externalUsername }}
           notice={notice}
         />
       </div>

@@ -7,7 +7,8 @@ knowledge base), Content Agent drafts an adapted variant per connected platform
 risk policy decides what the AI can do on its own versus what needs your
 sign-off. Runs itself every morning at 6am IST via cron, or on demand. Approved
 posts and replies publish for real once you've connected Buffer and/or X (see
-below); Instagram isn't built.
+below). AI-avatar Reels and photo Carousels (see Reels/Carousels in the app)
+publish straight to Instagram directly via Meta's own API, not Buffer.
 
 ## Setup
 
@@ -50,6 +51,7 @@ Open [http://localhost:3000](http://localhost:3000). You'll be redirected to
 | `HEYGEN_API_KEY` | From a HeyGen account (heygen.com) — generates the AI-avatar Reel videos (avatar, voice, and captions all in one call). Also backs the avatar picker on the Reel-generation flow, which lists the account's own digital-twin avatars live via `GET /v3/avatars/looks` — create at least one digital twin on your HeyGen account before generating a Reel. |
 | `HEYGEN_WEBHOOK_SECRET` | Random string appended to the webhook callback URL as `?secret=` — HeyGen calls this route with no session, so this is the payload-authenticity check. |
 | `UNSPLASH_ACCESS_KEY` | Free Unsplash developer app access key (unsplash.com/developers) — backs Carousel slide background photos. Optional: without it, Carousels still render, just with the plain gradient look instead of a photo per slide. Demo apps are capped at 50 requests/hour. |
+| `INSTAGRAM_CLIENT_ID`, `INSTAGRAM_CLIENT_SECRET` | From a Meta Developer App's Instagram product (Instagram API with Instagram Login) — powers direct Instagram publishing for Reels/Carousels. See below. |
 
 ## Connecting Buffer (recommended — covers X, Threads, LinkedIn, and real scheduling)
 
@@ -79,6 +81,26 @@ there's no direct LinkedIn/Threads integration in this app.
 X moved to **prepaid-credits-only** pay-per-use pricing in Feb 2026 — posting costs ~$0.015/post (~$0.20 if it contains a link), reading costs ~$0.005/post and ~$0.01/user. There's no postpaid "card on file" option and no free tier — buy a credit balance in the X Developer Portal before this will work, and set a per-cycle spending cap while you're there. Unlike Buffer, direct X posting is always immediate — there's no scheduling on this path.
 
 **What's live vs. simulated right now:** approving a `POST` or `REPLY` publishes for real once Buffer *or* X is connected (Buffer wins if both are). Nothing auto-posts — every item sits in the queue until you explicitly approve it. Real @-replies to real mentions aren't possible yet regardless of provider: the seeded mentions Community Agent drafts against are mock data with no real tweet behind them. Making that real means building live mention-polling from the X API (a separate, costlier feature — see "How it works" below).
+
+## Connecting Instagram directly (for Reels/Carousels — not Buffer)
+
+Buffer doesn't cover Instagram here — Reels/Carousels publish straight to
+Meta's own Content Publishing API instead, via a real per-account OAuth
+connect button in Settings.
+
+1. Create a Meta Developer App at [developers.facebook.com](https://developers.facebook.com/apps) (type: **Business**).
+2. Add the **Instagram** product, using **Instagram API with Instagram Login** (not Facebook Login) — this works directly against a Business/Creator Instagram account, no linked Facebook Page needed.
+3. In the Instagram product's settings, add `https://<your-domain>/api/connections/instagram/callback` as a valid OAuth redirect URI, and note the **Instagram App ID**/**Instagram App Secret**.
+4. Put those in `.env.local` as `INSTAGRAM_CLIENT_ID` / `INSTAGRAM_CLIENT_SECRET`.
+5. **To publish to your own account, you don't need App Review or Business Verification** — just add that Instagram account as an **Instagram Tester** in the app dashboard (while the app is in Development mode) and accept the invite from Instagram's own Settings → Apps and Websites → Tester Invites. App Review + Business Verification (a real multi-week process) is only required once *other people's* accounts need to connect, not for your own.
+6. Restart `npm run dev`, go to Settings, click **Connect Instagram**.
+
+Publishing itself is async (Meta's own container-processing step can take a
+couple minutes), handled by the `instagram-publish` Inngest function — same
+pattern as the HeyGen Reel-render pipeline. **If you add this function
+after Inngest was already synced once, you need to manually re-sync** (Inngest
+dashboard → Apps → your app → Sync) or events for it will be silently
+dropped — this bit Reels earlier for the exact same reason.
 
 ## Deploying (Vercel + Neon Postgres)
 

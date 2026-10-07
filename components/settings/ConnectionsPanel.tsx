@@ -7,6 +7,11 @@ interface XConnection {
   username?: string;
 }
 
+interface InstagramConnection {
+  connected: boolean;
+  username?: string;
+}
+
 interface BufferConnection {
   connected: boolean;
 }
@@ -43,7 +48,7 @@ export function ConnectionsPanel({
   x: XConnection;
   threads: BufferConnection;
   linkedin: BufferConnection;
-  instagram: BufferConnection;
+  instagram: InstagramConnection;
   notice?: { kind: "success" | "error"; message: string } | null;
 }) {
   return (
@@ -155,7 +160,7 @@ export function ConnectionsPanel({
           </p>
         </div>
 
-        {/* Instagram — via Buffer, for Reels and Carousels */}
+        {/* Instagram — direct, for Reels and Carousels */}
         <div className="flex flex-col rounded-xl border border-[var(--border)] p-5 transition hover:border-[var(--accent)] hover:shadow-sm">
           <div className="flex items-center gap-3">
             <Avatar>◎</Avatar>
@@ -163,7 +168,7 @@ export function ConnectionsPanel({
               <p className="font-semibold text-[var(--text-primary)]">Instagram</p>
               <p className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
                 <StatusDot ok={instagram.connected} />
-                {instagram.connected ? "Connected" : "Not connected"}
+                {instagram.connected ? `Connected as @${instagram.username}` : "Not connected"}
               </p>
             </div>
           </div>
@@ -171,16 +176,19 @@ export function ConnectionsPanel({
           <div className="mt-4 flex-1" />
 
           <a
-            href={BUFFER_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block rounded-lg border border-[var(--border)] px-4 py-2 text-center text-sm font-medium text-[var(--text-primary)] transition hover:border-[var(--accent)] hover:bg-[var(--surface-2)]"
+            href="/api/connections/instagram/start"
+            className="block rounded-lg px-4 py-2 text-center text-sm font-medium text-white transition hover:opacity-90"
+            style={{ background: "linear-gradient(120deg, #6229CE, #BC69EB)" }}
           >
-            Connect via Buffer
+            {instagram.connected ? "Reconnect" : "Connect Instagram"}
           </a>
-          <p className="mt-2 text-center text-[11px] font-medium text-[var(--status-critical)]">
-            Requires a third-party service (Buffer)
-          </p>
+          {instagram.connected && (
+            <form action="/api/connections/instagram/disconnect" method="POST" className="mt-2 text-center">
+              <button type="submit" className="text-xs text-[var(--text-muted)] underline-offset-2 hover:text-[var(--text-secondary)] hover:underline">
+                Disconnect
+              </button>
+            </form>
+          )}
         </div>
       </div>
     </section>

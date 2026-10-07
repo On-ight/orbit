@@ -3,12 +3,10 @@ import { prisma } from "@/lib/db/prisma";
 
 const BUFFER_API_URL = "https://api.buffer.com";
 
-// Wider than Platform on purpose — Platform means "text-post platform"
-// everywhere else in this codebase (approval tabs, PLATFORM_CHAR_LIMITS,
-// content-agent.ts's drafting loop), and Instagram never drafts as a plain
-// text post. This type exists specifically so Instagram can be a connectable
-// Buffer channel without leaking into any of that.
-export type BufferPlatform = Platform | "INSTAGRAM";
+// Buffer only ever covers X/Threads/LinkedIn — Instagram publishes directly
+// via Meta's API instead (lib/publishing/instagram-client.ts), so this is a
+// plain alias of Platform again rather than a wider type.
+export type BufferPlatform = Platform;
 
 // One shared Orbit-owned Buffer account/API key serves every tenant — each
 // customer's connected channel is manually added to it (see
@@ -113,11 +111,10 @@ export interface ScheduledBufferPost {
   status: "SCHEDULED" | "QUEUED";
 }
 
-// One entry per Buffer AssetInput: exactly one of image or video. Verified
-// against Buffer's published GraphQL docs (developers.buffer.com/examples,
-// /types/InstagramPostMetadataInput.html) — multiple image entries in one
-// post is how a carousel is expressed, there's no separate carousel type.
-export type BufferAsset = { image: { url: string } } | { video: { url: string; thumbnailUrl?: string } };
+// LinkedIn's optional attached image is the only Buffer asset left since
+// Instagram moved to direct publishing — a single AssetInput entry (Buffer's
+// GraphQL schema, developers.buffer.com/examples) with just an image.
+export type BufferAsset = { image: { url: string } };
 
 /**
  * Schedules a post through Buffer on this account's connected channel for
@@ -126,15 +123,8 @@ export type BufferAsset = { image: { url: string } } | { video: { url: string; t
  * next available slot. Every asset URL must be publicly reachable and
  * non-expiring — Buffer fetches them at actual publish time, which for a
  * scheduled post can be hours or days later, so a signed/expiring URL will
- * fail silently down the line. instagramType is required alongside any
- * Instagram asset (Buffer's metadata.instagram.type field has no default);
- * firstComment (hashtags posted separately from the caption) is a real
- * Buffer capability, but it's gated behind Buffer's paid plans — on a
- * free/basic plan Buffer silently drops it rather than posting it, so
- * callers on such a plan should append hashtags into `content` itself
- * instead (see app/api/approvals/[id]/route.ts). Throws on failure —
- * callers must not mark anything as published/scheduled unless this
- * resolves successfully.
+ * fail silently down the line. Throws on failure — callers must not mark
+ * anything as published/scheduled unless this resolves successfully.
  */
 export async function schedulePostToBuffer(
   accountId: string,
@@ -143,12 +133,10 @@ export async function schedulePostToBuffer(
   options?: {
     dueAt?: Date;
     assets?: BufferAsset[];
-    instagramType?: "post" | "reel";
-    firstComment?: string;
   },
 ): Promise<ScheduledBufferPost> {
   const channelId = await getChannelId(accountId, platform);
-  const { dueAt, assets, instagramType, firstComment } = options ?? {};
+  const { dueAt, assets } = options ?? {};
 
   const input: Record<string, unknown> = {
     text: content,
@@ -158,11 +146,6 @@ export async function schedulePostToBuffer(
   };
   if (dueAt) input.dueAt = dueAt.toISOString();
   if (assets && assets.length > 0) input.assets = assets;
-  if (instagramType) {
-    input.metadata = {
-      instagram: { type: instagramType, shouldShareToFeed: true, isAiGenerated: true, firstComment },
-    };
-  }
 
   const data = await bufferGraphQL<{
     createPost: { post?: { id: string }; message?: string };

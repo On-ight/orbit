@@ -29,3 +29,15 @@ export interface HeygenVideoCompletedData {
   status: "completed" | "failed";
   videoUrl: string | null;
 }
+
+// Sent by app/api/approvals/[id]/route.ts when an Instagram Reel/Carousel
+// gets approved and the account has a direct Instagram connection — Meta's
+// own container-processing + publish round-trip can take minutes (their own
+// guidance: poll up to 5 minutes), so this can't happen synchronously inside
+// the approve request the way Buffer's single immediate call could.
+export const INSTAGRAM_PUBLISH_REQUESTED = "instagram/publish.requested" as const;
+
+export interface InstagramPublishRequestedData {
+  accountId: string;
+  approvalId: string;
+}

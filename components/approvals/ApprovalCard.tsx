@@ -32,8 +32,9 @@ const TYPE_LABEL: Record<string, string> = {
   CAROUSEL: "🎠 Carousel",
 };
 
-// Matches the cap applied when actually publishing (app/api/approvals/[id]/route.ts)
-// — shown here so the card never displays more than what will really post.
+// Matches the cap applied when actually publishing (lib/publishing/
+// instagram-client.ts's buildInstagramCaption) — shown here so the card
+// never displays more than what will really post.
 const MAX_INSTAGRAM_HASHTAGS = 5;
 
 function formatHashtags(hashtags: string): string {
@@ -54,9 +55,11 @@ function charLimitFor(platform: string): number {
 export function ApprovalCard({
   approval,
   bufferPlatforms,
+  instagramConnected,
 }: {
   approval: ApprovalCardData;
   bufferPlatforms: string[];
+  instagramConnected: boolean;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -120,7 +123,8 @@ export function ApprovalCard({
   }
 
   const displayContent = approval.editedContent ?? approval.content;
-  const canPublishLive = bufferConfigured;
+  const isInstagram = approval.platform === "INSTAGRAM";
+  const canPublishLive = bufferConfigured || (isInstagram && instagramConnected);
   const overLimit = editing ? draft.length > limit : displayContent.length > limit;
 
   function publishNote(): string {
@@ -128,6 +132,9 @@ export function ApprovalCard({
       return scheduledFor
         ? `Approving this will schedule it via Buffer for ${new Date(scheduledFor).toLocaleString()}.`
         : "Approving this will queue it via Buffer for the next available slot.";
+    }
+    if (isInstagram && instagramConnected) {
+      return "Approving this will publish it directly to Instagram — this can take a few minutes while Instagram processes it.";
     }
     if (approval.type === "REEL") {
       return "Orbit doesn't publish to Instagram automatically yet — approving marks this ready, then download the video and post it yourself.";
