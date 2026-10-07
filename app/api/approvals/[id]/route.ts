@@ -4,14 +4,15 @@ import { withAuth } from "@/lib/auth/with-auth";
 import { approvalsLimiter } from "@/lib/redis/rate-limit";
 import { BufferPlatform, BufferAsset, isBufferConfiguredForPlatform, schedulePostToBuffer } from "@/lib/publishing/buffer-client";
 import { isInstagramConnected } from "@/lib/publishing/instagram-client";
-import { inngest, INSTAGRAM_PUBLISH_REQUESTED } from "@/lib/inngest/client";
+import { isThreadsConnected } from "@/lib/publishing/threads-client";
+import { inngest, INSTAGRAM_PUBLISH_REQUESTED, THREADS_PUBLISH_REQUESTED } from "@/lib/inngest/client";
 
 type Action = "approve" | "reject" | "edit";
 
-// Instagram publishes directly via Meta's API now (lib/publishing/
-// instagram-client.ts + lib/inngest/functions/instagram-publish.ts) — Buffer
-// only covers X/Threads/LinkedIn.
-const BUFFER_PLATFORMS: BufferPlatform[] = ["X", "THREADS", "LINKEDIN"];
+// Instagram and Threads both publish directly via Meta's API now
+// (lib/publishing/instagram-client.ts, lib/publishing/threads-client.ts) —
+// Buffer only covers X/LinkedIn.
+const BUFFER_PLATFORMS: BufferPlatform[] = ["X", "LINKEDIN"];
 
 interface LivePublishResult {
   publishedVia: "BUFFER";
@@ -101,15 +102,25 @@ export const PATCH = withAuth<{ params: Promise<{ id: string }> }>(async (reques
       }
     }
 
-    // Instagram Reels/Carousels publish directly via Meta's API instead —
-    // Meta's own container-processing + publish round-trip can take minutes
-    // (their guidance: poll up to 5 minutes), so this is an async Inngest
-    // job rather than a synchronous call like Buffer's. publishedVia/
-    // platformPostId/publishedUrl populate later once that job finishes,
-    // same eventually-consistent pattern Reel rendering itself already uses.
+    // Instagram (Reels/Carousels) and Threads both publish directly via
+    // Meta's API instead — their container-create-then-publish round-trip
+    // can't happen synchronously inside this request (Instagram alone needs
+    // up to 5 minutes of polling), so each is an async Inngest job rather
+    // than a synchronous call like Buffer's. publishedVia/platformPostId/
+    // publishedUrl populate later once that job finishes — asyncDirectPublish
+    // marks that this item is in that pending state, not actually published
+    // yet, so the Post-update block below doesn't prematurely mark it so.
+    let asyncDirectPublish = false;
     if (approval.platform === "INSTAGRAM" && (await isInstagramConnected(currentUser.accountId))) {
+      asyncDirectPublish = true;
       await inngest.send({
         name: INSTAGRAM_PUBLISH_REQUESTED,
+        data: { accountId: currentUser.accountId, approvalId: id },
+      });
+    } else if (approval.platform === "THREADS" && (await isThreadsConnected(currentUser.accountId))) {
+      asyncDirectPublish = true;
+      await inngest.send({
+        name: THREADS_PUBLISH_REQUESTED,
         data: { accountId: currentUser.accountId, approvalId: id },
       });
     }
@@ -134,7 +145,11 @@ export const PATCH = withAuth<{ params: Promise<{ id: string }> }>(async (reques
         data: { status: "REPLIED" },
       });
     }
-    if (approval.postId) {
+    // asyncDirectPublish means the real publish is still pending in Inngest
+    // — the linked Post stays untouched here (not marked published, not
+    // marked simulated either) and gets updated for real once that job
+    // finishes (see lib/inngest/functions/threads-publish.ts).
+    if (approval.postId && !asyncDirectPublish) {
       await prisma.post.update({
         where: { id: approval.postId },
         data: {
@@ -148,6 +163,8 @@ export const PATCH = withAuth<{ params: Promise<{ id: string }> }>(async (reques
           publishedUrl: livePublish?.publishedUrl,
         },
       });
+    } else if (approval.postId && asyncDirectPublish) {
+      await prisma.post.update({ where: { id: approval.postId }, data: { content: finalContent } });
     }
     // Just a status flip either way — if Instagram isn't connected, this
     // still marks the Reel/Carousel approved and the caption/hashtags stay

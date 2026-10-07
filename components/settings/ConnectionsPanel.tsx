@@ -12,6 +12,11 @@ interface InstagramConnection {
   username?: string;
 }
 
+interface ThreadsConnection {
+  connected: boolean;
+  username?: string;
+}
+
 interface BufferConnection {
   connected: boolean;
 }
@@ -46,7 +51,7 @@ export function ConnectionsPanel({
   notice,
 }: {
   x: XConnection;
-  threads: BufferConnection;
+  threads: ThreadsConnection;
   linkedin: BufferConnection;
   instagram: InstagramConnection;
   notice?: { kind: "success" | "error"; message: string } | null;
@@ -104,7 +109,7 @@ export function ConnectionsPanel({
           )}
         </div>
 
-        {/* Threads — via Buffer */}
+        {/* Threads — direct */}
         <div className="flex flex-col rounded-xl border border-[var(--border)] p-5 transition hover:border-[var(--accent)] hover:shadow-sm">
           <div className="flex items-center gap-3">
             <Avatar>@</Avatar>
@@ -112,7 +117,7 @@ export function ConnectionsPanel({
               <p className="font-semibold text-[var(--text-primary)]">Threads</p>
               <p className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
                 <StatusDot ok={threads.connected} />
-                {threads.connected ? "Connected" : "Not connected"}
+                {threads.connected ? `Connected as @${threads.username}` : "Not connected"}
               </p>
             </div>
           </div>
@@ -120,16 +125,19 @@ export function ConnectionsPanel({
           <div className="mt-4 flex-1" />
 
           <a
-            href={BUFFER_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block rounded-lg border border-[var(--border)] px-4 py-2 text-center text-sm font-medium text-[var(--text-primary)] transition hover:border-[var(--accent)] hover:bg-[var(--surface-2)]"
+            href="/api/connections/threads/start"
+            className="block rounded-lg px-4 py-2 text-center text-sm font-medium text-white transition hover:opacity-90"
+            style={{ background: "linear-gradient(120deg, #6229CE, #BC69EB)" }}
           >
-            Connect via Buffer
+            {threads.connected ? "Reconnect" : "Connect Threads"}
           </a>
-          <p className="mt-2 text-center text-[11px] font-medium text-[var(--status-critical)]">
-            Requires a third-party service (Buffer)
-          </p>
+          {threads.connected && (
+            <form action="/api/connections/threads/disconnect" method="POST" className="mt-2 text-center">
+              <button type="submit" className="text-xs text-[var(--text-muted)] underline-offset-2 hover:text-[var(--text-secondary)] hover:underline">
+                Disconnect
+              </button>
+            </form>
+          )}
         </div>
 
         {/* LinkedIn — via Buffer */}

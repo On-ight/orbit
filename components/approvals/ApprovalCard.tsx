@@ -56,10 +56,12 @@ export function ApprovalCard({
   approval,
   bufferPlatforms,
   instagramConnected,
+  threadsConnected,
 }: {
   approval: ApprovalCardData;
   bufferPlatforms: string[];
   instagramConnected: boolean;
+  threadsConnected: boolean;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -124,7 +126,9 @@ export function ApprovalCard({
 
   const displayContent = approval.editedContent ?? approval.content;
   const isInstagram = approval.platform === "INSTAGRAM";
-  const canPublishLive = bufferConfigured || (isInstagram && instagramConnected);
+  const isThreads = approval.platform === "THREADS";
+  const canPublishLive =
+    bufferConfigured || (isInstagram && instagramConnected) || (isThreads && threadsConnected);
   const overLimit = editing ? draft.length > limit : displayContent.length > limit;
 
   function publishNote(): string {
@@ -135,6 +139,9 @@ export function ApprovalCard({
     }
     if (isInstagram && instagramConnected) {
       return "Approving this will publish it directly to Instagram — this can take a few minutes while Instagram processes it.";
+    }
+    if (isThreads && threadsConnected) {
+      return "Approving this will publish it directly to Threads shortly.";
     }
     if (approval.type === "REEL") {
       return "Orbit doesn't publish to Instagram automatically yet — approving marks this ready, then download the video and post it yourself.";

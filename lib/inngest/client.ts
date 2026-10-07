@@ -41,3 +41,16 @@ export interface InstagramPublishRequestedData {
   accountId: string;
   approvalId: string;
 }
+
+// Sent by app/api/approvals/[id]/route.ts when a Threads post gets approved
+// and the account has a direct Threads connection — Meta's own guidance is
+// to wait ~30s after creating a container before publishing it, which is
+// short enough it could arguably be synchronous, but this stays async via
+// Inngest anyway for the same reason as Instagram: one consistent model for
+// "Meta platform publish," not two different ones to reason about.
+export const THREADS_PUBLISH_REQUESTED = "threads/publish.requested" as const;
+
+export interface ThreadsPublishRequestedData {
+  accountId: string;
+  approvalId: string;
+}

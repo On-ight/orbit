@@ -52,18 +52,21 @@ Open [http://localhost:3000](http://localhost:3000). You'll be redirected to
 | `HEYGEN_WEBHOOK_SECRET` | Random string appended to the webhook callback URL as `?secret=` — HeyGen calls this route with no session, so this is the payload-authenticity check. |
 | `UNSPLASH_ACCESS_KEY` | Free Unsplash developer app access key (unsplash.com/developers) — backs Carousel slide background photos. Optional: without it, Carousels still render, just with the plain gradient look instead of a photo per slide. Demo apps are capped at 50 requests/hour. |
 | `INSTAGRAM_CLIENT_ID`, `INSTAGRAM_CLIENT_SECRET` | From a Meta Developer App's Instagram product (Instagram API with Instagram Login) — powers direct Instagram publishing for Reels/Carousels. See below. |
+| `THREADS_APP_ID`, `THREADS_APP_SECRET` | From the same Meta Developer App's Threads product — a separate credential pair from Instagram's even though it's one app; Threads' endpoints reject the Instagram pair outright. Powers direct Threads publishing. See below. |
 
-## Connecting Buffer (recommended — covers X, Threads, LinkedIn, and real scheduling)
+## Connecting Buffer (covers X and LinkedIn; Threads and Instagram publish directly instead)
 
 Buffer's API is free on every plan (including free), and it's the only path here with
 actual scheduling — approving something can queue it for later instead of posting
-immediately. It's also the only way LinkedIn/Threads publishing works at all, since
-there's no direct LinkedIn/Threads integration in this app.
+immediately. It's also the only way LinkedIn publishing works at all, since there's
+no direct LinkedIn integration in this app. Threads and Instagram publish directly
+via Meta's own API instead (see their own sections below) — Buffer doesn't cover
+either anymore.
 
-1. In Buffer, connect the channel(s) you want to publish to (X, Threads, LinkedIn) — this happens in Buffer's own dashboard, not this app.
+1. In Buffer, connect the channel(s) you want to publish to (X, LinkedIn) — this happens in Buffer's own dashboard, not this app.
 2. Create a personal API key: profile icon → **API** (or [publish.buffer.com/settings/api](https://publish.buffer.com/settings/api)) → **Personal Access** tab → **+ New Key**. Give it all permissions and a 1-year expiry (keys aren't permanent like X's OAuth token — you'll need to regenerate this annually).
 3. Put it in `.env.local` as `BUFFER_API_KEY`.
-4. Run `npm run buffer:channels` — this lists your connected channels and their IDs. Copy each one you want into the matching `BUFFER_X_CHANNEL_ID` / `BUFFER_THREADS_CHANNEL_ID` / `BUFFER_LINKEDIN_CHANNEL_ID`. Only set the ones you've actually connected — Content Agent only drafts for platforms with a channel id present.
+4. Run `npm run buffer:channels` to find each connected channel's id, then `npm run buffer:assign -- <email> <X|LINKEDIN> <channelId>` to link it to a customer account (see `scripts/assign-buffer-channel.ts`).
 5. Restart `npm run dev`. Settings shows per-platform connection status.
 
 **Limitations to know about:**
@@ -80,7 +83,7 @@ there's no direct LinkedIn/Threads integration in this app.
 
 X moved to **prepaid-credits-only** pay-per-use pricing in Feb 2026 — posting costs ~$0.015/post (~$0.20 if it contains a link), reading costs ~$0.005/post and ~$0.01/user. There's no postpaid "card on file" option and no free tier — buy a credit balance in the X Developer Portal before this will work, and set a per-cycle spending cap while you're there. Unlike Buffer, direct X posting is always immediate — there's no scheduling on this path.
 
-**What's live vs. simulated right now:** approving a `POST` or `REPLY` publishes for real once Buffer *or* X is connected (Buffer wins if both are). Nothing auto-posts — every item sits in the queue until you explicitly approve it. Real @-replies to real mentions aren't possible yet regardless of provider: the seeded mentions Community Agent drafts against are mock data with no real tweet behind them. Making that real means building live mention-polling from the X API (a separate, costlier feature — see "How it works" below).
+**What's live vs. simulated right now:** approving a `POST` or `REPLY` publishes for real once Buffer *or* X is connected for that platform (Buffer wins if both are for X), or once Threads/Instagram are connected directly for their own platforms. Nothing auto-posts — every item sits in the queue until you explicitly approve it. Real @-replies to real mentions aren't possible yet regardless of provider: the seeded mentions Community Agent drafts against are mock data with no real tweet behind them. Making that real means building live mention-polling from the X API (a separate, costlier feature — see "How it works" below).
 
 ## Connecting Instagram directly (for Reels/Carousels — not Buffer)
 
@@ -101,6 +104,25 @@ pattern as the HeyGen Reel-render pipeline. **If you add this function
 after Inngest was already synced once, you need to manually re-sync** (Inngest
 dashboard → Apps → your app → Sync) or events for it will be silently
 dropped — this bit Reels earlier for the exact same reason.
+
+## Connecting Threads directly (not Buffer)
+
+Same deal as Instagram — Threads posts (`POST` approvals for the Threads
+platform) publish straight to Meta's Threads API via their own OAuth connect
+button, not Buffer.
+
+1. In the **same** Meta Developer App as Instagram, add the **Threads** product.
+2. Add `https://<your-domain>/api/connections/threads/callback` as a valid OAuth redirect URI, and note the **Threads App ID**/**Threads App Secret** — this is a separate credential pair from the Instagram one even though it's the same app; Threads' endpoints reject the Instagram pair.
+3. Put those in `.env.local` as `THREADS_APP_ID` / `THREADS_APP_SECRET`.
+4. Same Instagram Tester-style exemption applies — publishing to your own account needs no App Review/Business Verification, just adding that account as a tester and accepting the invite.
+5. Restart `npm run dev`, go to Settings, click **Connect Threads**.
+
+Publishing here is simpler than Instagram's (text-only, no carousel/video
+processing) — Meta's own guidance is just a ~30s wait after creating the
+post container before publishing it — but it still runs through the
+`threads-publish` Inngest function for one consistent "Meta platform
+publish" model rather than a one-off synchronous path. Same Inngest-resync
+caveat as Instagram applies the first time this function is added.
 
 ## Deploying (Vercel + Neon Postgres)
 

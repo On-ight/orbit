@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { ApprovalCard } from "@/components/approvals/ApprovalCard";
 import { activeBufferPlatforms } from "@/lib/publishing/buffer-client";
 import { isInstagramConnected } from "@/lib/publishing/instagram-client";
+import { isThreadsConnected } from "@/lib/publishing/threads-client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { PLATFORMS, Platform } from "@/lib/types";
 
@@ -41,10 +42,16 @@ export default async function ApprovalsPage({
     orderBy: { createdAt: "desc" },
   });
 
-  const [bufferPlatforms, instagramConnected] = await Promise.all([
+  const [rawBufferPlatforms, instagramConnected, threadsConnected] = await Promise.all([
     activeBufferPlatforms(currentUser.accountId),
     isInstagramConnected(currentUser.accountId),
+    isThreadsConnected(currentUser.accountId),
   ]);
+  // Threads moved off Buffer onto direct publishing — strip it out here so
+  // a leftover AccountBufferChannel row from before that change (if one
+  // still exists) can't make the card claim Buffer handles it when
+  // app/api/approvals/[id]/route.ts no longer attempts Buffer for Threads at all.
+  const bufferPlatforms = rawBufferPlatforms.filter((p) => p !== "THREADS");
 
   return (
     <div>
@@ -91,6 +98,7 @@ export default async function ApprovalsPage({
             key={approval.id}
             bufferPlatforms={bufferPlatforms}
             instagramConnected={instagramConnected}
+            threadsConnected={threadsConnected}
             approval={{
               ...approval,
               createdAt: approval.createdAt.toISOString(),

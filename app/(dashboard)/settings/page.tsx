@@ -74,6 +74,13 @@ function instagramErrorMessage(code: string): string {
   return "Couldn't connect Instagram — try again, or contact support if it keeps happening.";
 }
 
+function threadsErrorMessage(code: string): string {
+  if (code === "not_configured") return "Threads isn't configured yet — contact support.";
+  if (code === "missing_params" || code === "expired") return "That connection link expired — try again.";
+  if (code === "token_mismatch") return "Something didn't match up — try connecting again.";
+  return "Couldn't connect Threads — try again, or contact support if it keeps happening.";
+}
+
 export default async function SettingsPage({
   searchParams,
 }: {
@@ -83,12 +90,13 @@ export default async function SettingsPage({
   const { accountId } = currentUser;
   const params = await searchParams;
 
-  const [runs, platformConnections, knowledgeBaseEntries, xToken, instagramToken] = await Promise.all([
+  const [runs, platformConnections, knowledgeBaseEntries, xToken, instagramToken, threadsToken] = await Promise.all([
     prisma.agentRun.findMany({ where: { accountId }, orderBy: { startedAt: "desc" }, take: 10 }),
     Promise.all(PLATFORMS.map(async (p) => [p, await isBufferConfiguredForPlatform(accountId, p)] as const)),
     prisma.knowledgeBaseEntry.findMany({ where: { accountId }, orderBy: { createdAt: "asc" } }),
     prisma.accountSocialToken.findUnique({ where: { accountId_platform: { accountId, platform: "X" } } }),
     prisma.accountSocialToken.findUnique({ where: { accountId_platform: { accountId, platform: "INSTAGRAM" } } }),
+    prisma.accountSocialToken.findUnique({ where: { accountId_platform: { accountId, platform: "THREADS" } } }),
   ]);
 
   const connectedByPlatform = Object.fromEntries(platformConnections);
@@ -109,6 +117,15 @@ export default async function SettingsPage({
     notice = { kind: "success", message: "Instagram disconnected." };
   } else if (typeof params.instagram_error === "string") {
     notice = { kind: "error", message: instagramErrorMessage(params.instagram_error) };
+  } else if (params.threads_connected) {
+    notice = {
+      kind: "success",
+      message: `Connected as @${threadsToken?.externalUsername ?? "your account"}.`,
+    };
+  } else if (params.threads_disconnected) {
+    notice = { kind: "success", message: "Threads disconnected." };
+  } else if (typeof params.threads_error === "string") {
+    notice = { kind: "error", message: threadsErrorMessage(params.threads_error) };
   }
 
   return (
@@ -118,7 +135,7 @@ export default async function SettingsPage({
       <div className="mt-6">
         <ConnectionsPanel
           x={{ connected: Boolean(xToken), username: xToken?.externalUsername }}
-          threads={{ connected: connectedByPlatform.THREADS }}
+          threads={{ connected: Boolean(threadsToken), username: threadsToken?.externalUsername }}
           linkedin={{ connected: connectedByPlatform.LINKEDIN }}
           instagram={{ connected: Boolean(instagramToken), username: instagramToken?.externalUsername }}
           notice={notice}
