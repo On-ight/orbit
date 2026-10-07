@@ -1,7 +1,7 @@
 import pLimit from "p-limit";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
-import { getXReadClient, getXExternalUserId } from "@/lib/publishing/x-read-client";
+import { getXClient, getXExternalUserId } from "@/lib/publishing/x-client";
 
 // upsertMention is DB-only (no LLM call), so this can run a bit higher than
 // the LLM-calling agent loops.
@@ -39,7 +39,7 @@ export interface DiscoverMentionsResult {
  * has no X connection: nothing to discover from isn't a failure.
  */
 export async function discoverMentions(accountId: string): Promise<DiscoverMentionsResult> {
-  const client = await getXReadClient(accountId);
+  const client = await getXClient(accountId);
   if (!client) {
     return { ok: true, created: 0 };
   }

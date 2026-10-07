@@ -40,9 +40,8 @@ Open [http://localhost:3000](http://localhost:3000). You'll be redirected to
 | `GROQ_API_KEY` | Powers the three agents. Without it, agent runs still complete but every item fails safe to the flagged/`NEVER` risk tier (see Settings page). |
 | `DASHBOARD_PASSWORD` | Shared password gating the whole app — change this before sharing the URL with anyone |
 | `SESSION_SECRET` | Signs the session cookie — use a long random string before deploying anywhere real |
-| `X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_SECRET` | OAuth 1.0a user-context credentials for posting to X directly. Optional if Buffer's X channel is connected. See below. |
+| `X_CLIENT_ID`, `X_CLIENT_SECRET` | OAuth 2.0 + PKCE app credentials from the X Developer Portal — powers the per-account "Connect X" button in Settings, used for both reading mentions and publishing directly (one connection, not two). See below. |
 | `BUFFER_API_KEY` | Personal Buffer API key. See below. |
-| `BUFFER_X_CHANNEL_ID`, `BUFFER_THREADS_CHANNEL_ID`, `BUFFER_LINKEDIN_CHANNEL_ID` | Per-platform Buffer channel ids — find them with `npm run buffer:channels`. A platform only gets drafted for if its channel id is set. Buffer takes priority over direct X per-platform. |
 | `CRON_SECRET` | Random string Vercel sends as `Authorization: Bearer <this>` when it fires the daily cron job. Only matters on Vercel, but set here too so local `curl` tests of the cron route work. |
 | `BLOB_READ_WRITE_TOKEN` | Powers LinkedIn image uploads via Vercel Blob. Auto-injected once you add Blob storage from the Vercel dashboard's Storage tab. |
 | `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY` | From an Inngest account (app.inngest.com) — runs the agent cycle pipeline as durable background jobs instead of inline in the request. Locally, `npx inngest-cli@latest dev` works without these. |
@@ -54,36 +53,36 @@ Open [http://localhost:3000](http://localhost:3000). You'll be redirected to
 | `INSTAGRAM_CLIENT_ID`, `INSTAGRAM_CLIENT_SECRET` | From a Meta Developer App's Instagram product (Instagram API with Instagram Login) — powers direct Instagram publishing for Reels/Carousels. See below. |
 | `THREADS_APP_ID`, `THREADS_APP_SECRET` | From the same Meta Developer App's Threads product — a separate credential pair from Instagram's even though it's one app; Threads' endpoints reject the Instagram pair outright. Powers direct Threads publishing. See below. |
 
-## Connecting Buffer (covers X and LinkedIn; Threads and Instagram publish directly instead)
+## Connecting X (Twitter) directly
+
+X publishes (and reads mentions) through one per-account OAuth connection —
+there's no separate "direct publish" credential anymore. The same
+"Connect X" button and token power both.
+
+1. Apply for a developer account at [developer.x.com](https://developer.x.com) and create a Project + App.
+2. In the app's **User authentication settings**, enable **OAuth 2.0** and set **App permissions** to **Read and Write** (posting fails with a 403 under Read-only). Type of App: **Web App**.
+3. Add `https://<your-domain>/api/connections/x/callback` as a callback/redirect URI.
+4. Copy the **Client ID**/**Client Secret** into `.env.local` as `X_CLIENT_ID` / `X_CLIENT_SECRET`.
+5. Restart `npm run dev`, go to Settings, click **Connect X**.
+
+X moved to **prepaid-credits-only** pay-per-use pricing in Feb 2026 — posting costs ~$0.015/post (~$0.20 if it contains a link), reading costs ~$0.005/post and ~$0.01/user. There's no postpaid "card on file" option and no free tier — buy a credit balance in the X Developer Portal before this will work, and set a per-cycle spending cap while you're there. Direct X posting is always immediate — there's no scheduling on this path, unlike Buffer. `REPLY`-type approvals post as genuine in-thread @-replies (not standalone posts) since the real tweet being replied to is already on hand from mention discovery.
+
+## Connecting Buffer (covers LinkedIn only; X/Threads/Instagram all publish directly)
 
 Buffer's API is free on every plan (including free), and it's the only path here with
 actual scheduling — approving something can queue it for later instead of posting
 immediately. It's also the only way LinkedIn publishing works at all, since there's
-no direct LinkedIn integration in this app. Threads and Instagram publish directly
-via Meta's own API instead (see their own sections below) — Buffer doesn't cover
-either anymore.
+no direct LinkedIn integration in this app yet.
 
-1. In Buffer, connect the channel(s) you want to publish to (X, LinkedIn) — this happens in Buffer's own dashboard, not this app.
+1. In Buffer, connect the LinkedIn channel you want to publish to — this happens in Buffer's own dashboard, not this app.
 2. Create a personal API key: profile icon → **API** (or [publish.buffer.com/settings/api](https://publish.buffer.com/settings/api)) → **Personal Access** tab → **+ New Key**. Give it all permissions and a 1-year expiry (keys aren't permanent like X's OAuth token — you'll need to regenerate this annually).
 3. Put it in `.env.local` as `BUFFER_API_KEY`.
-4. Run `npm run buffer:channels` to find each connected channel's id, then `npm run buffer:assign -- <email> <X|LINKEDIN> <channelId>` to link it to a customer account (see `scripts/assign-buffer-channel.ts`).
+4. Run `npm run buffer:channels` to find the channel's id, then `npm run buffer:assign -- <email> LINKEDIN <channelId>` to link it to a customer account (see `scripts/assign-buffer-channel.ts`).
 5. Restart `npm run dev`. Settings shows per-platform connection status.
 
-**Limitations to know about:**
-- Buffer schedules standalone posts to a channel's queue — it does not post in-thread replies to a specific post. `REPLY`-type approvals published via Buffer go out as regular posts with the drafted text, not as an actual @-reply under the original.
-- LinkedIn image attachments must be a **publicly reachable, non-expiring URL** — Buffer fetches the image at actual publish time (which can be hours later for a scheduled post), so a signed/expiring URL fails silently. That's why LinkedIn image uploads go through Vercel Blob (see Deploying) rather than any temporary storage.
+**Limitations to know about:** LinkedIn image attachments must be a **publicly reachable, non-expiring URL** — Buffer fetches the image at actual publish time (which can be hours later for a scheduled post), so a signed/expiring URL fails silently. That's why LinkedIn image uploads go through Vercel Blob (see Deploying) rather than any temporary storage.
 
-## Connecting X (Twitter) directly (optional, only used when Buffer isn't connected)
-
-1. Apply for a developer account at [developer.x.com](https://developer.x.com) and create a Project + App.
-2. In the app's **User authentication settings**, enable OAuth 1.0a and set App permissions to **Read and Write** (posting fails with a 403 under Read-only).
-3. Generate/regenerate: **API Key & Secret** and **Access Token & Secret** (must be regenerated *after* switching to Read and Write, or they'll carry the old read-only scope).
-4. Drop all four into `.env.local` as `X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_SECRET`.
-5. Restart `npm run dev`.
-
-X moved to **prepaid-credits-only** pay-per-use pricing in Feb 2026 — posting costs ~$0.015/post (~$0.20 if it contains a link), reading costs ~$0.005/post and ~$0.01/user. There's no postpaid "card on file" option and no free tier — buy a credit balance in the X Developer Portal before this will work, and set a per-cycle spending cap while you're there. Unlike Buffer, direct X posting is always immediate — there's no scheduling on this path.
-
-**What's live vs. simulated right now:** approving a `POST` or `REPLY` publishes for real once Buffer *or* X is connected for that platform (Buffer wins if both are for X), or once Threads/Instagram are connected directly for their own platforms. Nothing auto-posts — every item sits in the queue until you explicitly approve it. Real @-replies to real mentions aren't possible yet regardless of provider: the seeded mentions Community Agent drafts against are mock data with no real tweet behind them. Making that real means building live mention-polling from the X API (a separate, costlier feature — see "How it works" below).
+**What's live vs. simulated right now:** approving a `POST` publishes for real once that platform is connected (X/Threads/Instagram directly, LinkedIn via Buffer). Approving a `REPLY` posts a genuine in-thread @-reply once X is connected — `discoverMentions()` (`lib/agents/discover-mentions.ts`) pulls real mentions and keyword matches via that same connection, not mock data. Nothing auto-posts — every item sits in the queue until you explicitly approve it.
 
 ## Connecting Instagram directly (for Reels/Carousels — not Buffer)
 

@@ -57,11 +57,13 @@ export function ApprovalCard({
   bufferPlatforms,
   instagramConnected,
   threadsConnected,
+  xConnected,
 }: {
   approval: ApprovalCardData;
   bufferPlatforms: string[];
   instagramConnected: boolean;
   threadsConnected: boolean;
+  xConnected: boolean;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -127,8 +129,12 @@ export function ApprovalCard({
   const displayContent = approval.editedContent ?? approval.content;
   const isInstagram = approval.platform === "INSTAGRAM";
   const isThreads = approval.platform === "THREADS";
+  const isX = approval.platform === "X";
   const canPublishLive =
-    bufferConfigured || (isInstagram && instagramConnected) || (isThreads && threadsConnected);
+    bufferConfigured ||
+    (isInstagram && instagramConnected) ||
+    (isThreads && threadsConnected) ||
+    (isX && xConnected);
   const overLimit = editing ? draft.length > limit : displayContent.length > limit;
 
   function publishNote(): string {
@@ -136,6 +142,11 @@ export function ApprovalCard({
       return scheduledFor
         ? `Approving this will schedule it via Buffer for ${new Date(scheduledFor).toLocaleString()}.`
         : "Approving this will queue it via Buffer for the next available slot.";
+    }
+    if (isX && xConnected) {
+      return approval.type === "REPLY"
+        ? "Approving this will post it directly to X as a real reply."
+        : "Approving this will publish it directly to X.";
     }
     if (isInstagram && instagramConnected) {
       return "Approving this will publish it directly to Instagram — this can take a few minutes while Instagram processes it.";

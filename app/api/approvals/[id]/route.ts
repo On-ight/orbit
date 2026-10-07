@@ -5,17 +5,18 @@ import { approvalsLimiter } from "@/lib/redis/rate-limit";
 import { BufferPlatform, BufferAsset, isBufferConfiguredForPlatform, schedulePostToBuffer } from "@/lib/publishing/buffer-client";
 import { isInstagramConnected } from "@/lib/publishing/instagram-client";
 import { isThreadsConnected } from "@/lib/publishing/threads-client";
+import { isXConnected, publishPostToX } from "@/lib/publishing/x-client";
 import { inngest, INSTAGRAM_PUBLISH_REQUESTED, THREADS_PUBLISH_REQUESTED } from "@/lib/inngest/client";
 
 type Action = "approve" | "reject" | "edit";
 
-// Instagram and Threads both publish directly via Meta's API now
-// (lib/publishing/instagram-client.ts, lib/publishing/threads-client.ts) —
-// Buffer only covers X/LinkedIn.
-const BUFFER_PLATFORMS: BufferPlatform[] = ["X", "LINKEDIN"];
+// Instagram, Threads, and X all publish directly now (lib/publishing/
+// instagram-client.ts, threads-client.ts, x-client.ts) — Buffer only
+// covers LinkedIn, since there's no direct LinkedIn integration here.
+const BUFFER_PLATFORMS: BufferPlatform[] = ["LINKEDIN"];
 
 interface LivePublishResult {
-  publishedVia: "BUFFER";
+  publishedVia: "BUFFER" | "X";
   platformPostId: string;
   publishedUrl: string | null;
   scheduledFor: Date | null;
@@ -38,6 +39,10 @@ export const PATCH = withAuth<{ params: Promise<{ id: string }> }>(async (reques
     include: {
       reel: { select: { videoUrl: true, hashtags: true } },
       carousel: { select: { slideImageUrls: true, hashtags: true } },
+      // Only populated for REPLY approvals — the real tweet being replied
+      // to, so direct X publishing can post an actual in-thread reply
+      // instead of a standalone post (see the X-publish branch below).
+      conversation: { select: { sourceMention: { select: { platformPostId: true } } } },
     },
   });
   // Not found and "belongs to someone else" both come back as 404 — don't
@@ -99,6 +104,28 @@ export const PATCH = withAuth<{ params: Promise<{ id: string }> }>(async (reques
           { error: `Failed to schedule via Buffer: ${String(err)}` },
           { status: 502 },
         );
+      }
+    }
+
+    // X publishes directly via this account's own connected token (the same
+    // OAuth2 connection used for reading mentions already requested
+    // tweet.write scope) — a single immediate API call, no polling needed,
+    // so this stays synchronous like Buffer's path rather than Instagram/
+    // Threads' async Inngest jobs. Never a shared/global credential — one
+    // tenant can never post through another's connected account.
+    if (!livePublish && approval.platform === "X" && (await isXConnected(currentUser.accountId))) {
+      try {
+        const replyToTweetId =
+          approval.type === "REPLY" ? approval.conversation?.sourceMention.platformPostId : undefined;
+        const result = await publishPostToX(currentUser.accountId, finalContent, replyToTweetId);
+        livePublish = {
+          publishedVia: "X",
+          platformPostId: result.platformPostId,
+          publishedUrl: result.url,
+          scheduledFor: null,
+        };
+      } catch (err) {
+        return NextResponse.json({ error: `Failed to publish to X: ${String(err)}` }, { status: 502 });
       }
     }
 
