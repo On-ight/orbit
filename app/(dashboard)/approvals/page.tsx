@@ -5,6 +5,7 @@ import { activeBufferPlatforms } from "@/lib/publishing/buffer-client";
 import { isInstagramConnected } from "@/lib/publishing/instagram-client";
 import { isThreadsConnected } from "@/lib/publishing/threads-client";
 import { isXConnected } from "@/lib/publishing/x-client";
+import { isLinkedInConnected } from "@/lib/publishing/linkedin-client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { PLATFORMS, Platform } from "@/lib/types";
 
@@ -43,17 +44,19 @@ export default async function ApprovalsPage({
     orderBy: { createdAt: "desc" },
   });
 
-  const [rawBufferPlatforms, instagramConnected, threadsConnected, xConnected] = await Promise.all([
+  const [rawBufferPlatforms, instagramConnected, threadsConnected, xConnected, linkedinConnected] = await Promise.all([
     activeBufferPlatforms(currentUser.accountId),
     isInstagramConnected(currentUser.accountId),
     isThreadsConnected(currentUser.accountId),
     isXConnected(currentUser.accountId),
+    isLinkedInConnected(currentUser.accountId),
   ]);
-  // Threads and X both moved off Buffer onto direct publishing — strip them
-  // out here so a leftover AccountBufferChannel row from before that change
-  // (if one still exists) can't make the card claim Buffer handles them when
-  // app/api/approvals/[id]/route.ts no longer attempts Buffer for either.
-  const bufferPlatforms = rawBufferPlatforms.filter((p) => p !== "THREADS" && p !== "X");
+  // Threads, X, and LinkedIn all moved off Buffer onto direct publishing —
+  // strip them out here so a leftover AccountBufferChannel row from before
+  // that change (if one still exists) can't make the card claim Buffer
+  // handles them when app/api/approvals/[id]/route.ts no longer attempts
+  // Buffer for any of them.
+  const bufferPlatforms = rawBufferPlatforms.filter((p) => p !== "THREADS" && p !== "X" && p !== "LINKEDIN");
 
   return (
     <div>
@@ -102,6 +105,7 @@ export default async function ApprovalsPage({
             instagramConnected={instagramConnected}
             threadsConnected={threadsConnected}
             xConnected={xConnected}
+            linkedinConnected={linkedinConnected}
             approval={{
               ...approval,
               createdAt: approval.createdAt.toISOString(),

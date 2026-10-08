@@ -5,9 +5,7 @@ import { RunHistory } from "@/components/settings/RunHistory";
 import { KnowledgeBaseManager } from "@/components/settings/KnowledgeBaseManager";
 import { ConnectionsPanel } from "@/components/settings/ConnectionsPanel";
 import { AutomationSettings } from "@/components/settings/AutomationSettings";
-import { isBufferConfiguredForPlatform } from "@/lib/publishing/buffer-client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
-import { PLATFORMS } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -81,6 +79,19 @@ function threadsErrorMessage(code: string): string {
   return "Couldn't connect Threads — try again, or contact support if it keeps happening.";
 }
 
+// Pulled out of the component body — same reason as app/(dashboard)/layout.tsx's
+// trialDaysLeft: eslint's react-hooks/purity rule flags Date.now() inline.
+function isTokenLive(expiresAt: Date | undefined): boolean {
+  return Boolean(expiresAt) && expiresAt!.getTime() > Date.now();
+}
+
+function linkedinErrorMessage(code: string): string {
+  if (code === "not_configured") return "LinkedIn isn't configured yet — contact support.";
+  if (code === "missing_params" || code === "expired") return "That connection link expired — try again.";
+  if (code === "token_mismatch") return "Something didn't match up — try connecting again.";
+  return "Couldn't connect LinkedIn — try again, or contact support if it keeps happening.";
+}
+
 export default async function SettingsPage({
   searchParams,
 }: {
@@ -90,16 +101,14 @@ export default async function SettingsPage({
   const { accountId } = currentUser;
   const params = await searchParams;
 
-  const [runs, platformConnections, knowledgeBaseEntries, xToken, instagramToken, threadsToken] = await Promise.all([
+  const [runs, knowledgeBaseEntries, xToken, instagramToken, threadsToken, linkedinToken] = await Promise.all([
     prisma.agentRun.findMany({ where: { accountId }, orderBy: { startedAt: "desc" }, take: 10 }),
-    Promise.all(PLATFORMS.map(async (p) => [p, await isBufferConfiguredForPlatform(accountId, p)] as const)),
     prisma.knowledgeBaseEntry.findMany({ where: { accountId }, orderBy: { createdAt: "asc" } }),
     prisma.accountSocialToken.findUnique({ where: { accountId_platform: { accountId, platform: "X" } } }),
     prisma.accountSocialToken.findUnique({ where: { accountId_platform: { accountId, platform: "INSTAGRAM" } } }),
     prisma.accountSocialToken.findUnique({ where: { accountId_platform: { accountId, platform: "THREADS" } } }),
+    prisma.accountSocialToken.findUnique({ where: { accountId_platform: { accountId, platform: "LINKEDIN" } } }),
   ]);
-
-  const connectedByPlatform = Object.fromEntries(platformConnections);
 
   let notice: { kind: "success" | "error"; message: string } | null = null;
   if (params.x_connected) {
@@ -126,7 +135,22 @@ export default async function SettingsPage({
     notice = { kind: "success", message: "Threads disconnected." };
   } else if (typeof params.threads_error === "string") {
     notice = { kind: "error", message: threadsErrorMessage(params.threads_error) };
+  } else if (params.linkedin_connected) {
+    notice = {
+      kind: "success",
+      message: `Connected as ${linkedinToken?.externalUsername ?? "your account"}.`,
+    };
+  } else if (params.linkedin_disconnected) {
+    notice = { kind: "success", message: "LinkedIn disconnected." };
+  } else if (typeof params.linkedin_error === "string") {
+    notice = { kind: "error", message: linkedinErrorMessage(params.linkedin_error) };
   }
+
+  // No refresh token exists for LinkedIn (self-serve apps don't get one —
+  // see lib/publishing/linkedin-client.ts), so a token past its
+  // tokenExpiresAt genuinely cannot be used — same "Not connected" state
+  // the UI already shows, not a new one.
+  const linkedinConnected = isTokenLive(linkedinToken?.tokenExpiresAt);
 
   return (
     <div>
@@ -136,7 +160,7 @@ export default async function SettingsPage({
         <ConnectionsPanel
           x={{ connected: Boolean(xToken), username: xToken?.externalUsername }}
           threads={{ connected: Boolean(threadsToken), username: threadsToken?.externalUsername }}
-          linkedin={{ connected: connectedByPlatform.LINKEDIN }}
+          linkedin={{ connected: linkedinConnected, username: linkedinToken?.externalUsername }}
           instagram={{ connected: Boolean(instagramToken), username: instagramToken?.externalUsername }}
           notice={notice}
         />

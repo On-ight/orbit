@@ -17,11 +17,10 @@ interface ThreadsConnection {
   username?: string;
 }
 
-interface BufferConnection {
+interface LinkedInConnection {
   connected: boolean;
+  username?: string;
 }
-
-const BUFFER_URL = "https://publish.buffer.com/";
 
 function Avatar({ children }: { children: React.ReactNode }) {
   return (
@@ -52,7 +51,7 @@ export function ConnectionsPanel({
 }: {
   x: XConnection;
   threads: ThreadsConnection;
-  linkedin: BufferConnection;
+  linkedin: LinkedInConnection;
   instagram: InstagramConnection;
   notice?: { kind: "success" | "error"; message: string } | null;
 }) {
@@ -140,7 +139,7 @@ export function ConnectionsPanel({
           )}
         </div>
 
-        {/* LinkedIn — via Buffer */}
+        {/* LinkedIn — direct */}
         <div className="flex flex-col rounded-xl border border-[var(--border)] p-5 transition hover:border-[var(--accent)] hover:shadow-sm">
           <div className="flex items-center gap-3">
             <Avatar>in</Avatar>
@@ -148,7 +147,7 @@ export function ConnectionsPanel({
               <p className="font-semibold text-[var(--text-primary)]">LinkedIn</p>
               <p className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
                 <StatusDot ok={linkedin.connected} />
-                {linkedin.connected ? "Connected" : "Not connected"}
+                {linkedin.connected ? `Connected as ${linkedin.username}` : "Not connected"}
               </p>
             </div>
           </div>
@@ -156,15 +155,21 @@ export function ConnectionsPanel({
           <div className="mt-4 flex-1" />
 
           <a
-            href={BUFFER_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block rounded-lg border border-[var(--border)] px-4 py-2 text-center text-sm font-medium text-[var(--text-primary)] transition hover:border-[var(--accent)] hover:bg-[var(--surface-2)]"
+            href="/api/connections/linkedin/start"
+            className="block rounded-lg px-4 py-2 text-center text-sm font-medium text-white transition hover:opacity-90"
+            style={{ background: "linear-gradient(120deg, #6229CE, #BC69EB)" }}
           >
-            Connect via Buffer
+            {linkedin.connected ? "Reconnect" : "Connect LinkedIn"}
           </a>
-          <p className="mt-2 text-center text-[11px] font-medium text-[var(--status-critical)]">
-            Requires a third-party service (Buffer)
+          {linkedin.connected && (
+            <form action="/api/connections/linkedin/disconnect" method="POST" className="mt-2 text-center">
+              <button type="submit" className="text-xs text-[var(--text-muted)] underline-offset-2 hover:text-[var(--text-secondary)] hover:underline">
+                Disconnect
+              </button>
+            </form>
+          )}
+          <p className="mt-2 text-center text-[11px] text-[var(--text-muted)]">
+            Reconnect roughly every 60 days — LinkedIn doesn&apos;t allow silent token refresh for this app type.
           </p>
         </div>
 

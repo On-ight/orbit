@@ -27,6 +27,12 @@ export const threadsCallbackLimiter = new Ratelimit({
   prefix: "ratelimit:threads-callback",
 });
 
+export const linkedinCallbackLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(20, "60 s"),
+  prefix: "ratelimit:linkedin-callback",
+});
+
 export const agentsRunLimiter = new Ratelimit({
   redis,
   limiter: Ratelimit.slidingWindow(1, "300 s"),

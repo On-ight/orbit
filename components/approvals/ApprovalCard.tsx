@@ -58,12 +58,14 @@ export function ApprovalCard({
   instagramConnected,
   threadsConnected,
   xConnected,
+  linkedinConnected,
 }: {
   approval: ApprovalCardData;
   bufferPlatforms: string[];
   instagramConnected: boolean;
   threadsConnected: boolean;
   xConnected: boolean;
+  linkedinConnected: boolean;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -130,11 +132,13 @@ export function ApprovalCard({
   const isInstagram = approval.platform === "INSTAGRAM";
   const isThreads = approval.platform === "THREADS";
   const isX = approval.platform === "X";
+  const isLinkedIn = approval.platform === "LINKEDIN";
   const canPublishLive =
     bufferConfigured ||
     (isInstagram && instagramConnected) ||
     (isThreads && threadsConnected) ||
-    (isX && xConnected);
+    (isX && xConnected) ||
+    (isLinkedIn && linkedinConnected);
   const overLimit = editing ? draft.length > limit : displayContent.length > limit;
 
   function publishNote(): string {
@@ -153,6 +157,9 @@ export function ApprovalCard({
     }
     if (isThreads && threadsConnected) {
       return "Approving this will publish it directly to Threads shortly.";
+    }
+    if (isLinkedIn && linkedinConnected) {
+      return "Approving this will publish it directly to your LinkedIn profile.";
     }
     if (approval.type === "REEL") {
       return "Orbit doesn't publish to Instagram automatically yet — approving marks this ready, then download the video and post it yourself.";

@@ -6,9 +6,10 @@ knowledge base), Content Agent drafts an adapted variant per connected platform
 (X/Threads/LinkedIn), everything lands in an approval queue, and a three-tier
 risk policy decides what the AI can do on its own versus what needs your
 sign-off. Runs itself every morning at 6am IST via cron, or on demand. Approved
-posts and replies publish for real once you've connected Buffer and/or X (see
-below). AI-avatar Reels and photo Carousels (see Reels/Carousels in the app)
-publish straight to Instagram directly via Meta's own API, not Buffer.
+posts and replies publish for real once you've connected X, Threads, and/or
+LinkedIn directly (see below) — nothing publishes through Buffer anymore.
+AI-avatar Reels and photo Carousels (see Reels/Carousels in the app) publish
+straight to Instagram directly via Meta's own API too.
 
 ## Setup
 
@@ -41,9 +42,10 @@ Open [http://localhost:3000](http://localhost:3000). You'll be redirected to
 | `DASHBOARD_PASSWORD` | Shared password gating the whole app — change this before sharing the URL with anyone |
 | `SESSION_SECRET` | Signs the session cookie — use a long random string before deploying anywhere real |
 | `X_CLIENT_ID`, `X_CLIENT_SECRET` | OAuth 2.0 + PKCE app credentials from the X Developer Portal — powers the per-account "Connect X" button in Settings, used for both reading mentions and publishing directly (one connection, not two). See below. |
-| `BUFFER_API_KEY` | Personal Buffer API key. See below. |
+| `BUFFER_API_KEY` | Personal Buffer API key. No platform currently publishes through it (X/Threads/Instagram/LinkedIn all publish directly) — the code path still works and is kept around in case a platform ever needs to move back onto it, just dormant. |
+| `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET` | From a LinkedIn Developer App — powers direct LinkedIn publishing to your own profile. See below. |
 | `CRON_SECRET` | Random string Vercel sends as `Authorization: Bearer <this>` when it fires the daily cron job. Only matters on Vercel, but set here too so local `curl` tests of the cron route work. |
-| `BLOB_READ_WRITE_TOKEN` | Powers LinkedIn image uploads via Vercel Blob. Auto-injected once you add Blob storage from the Vercel dashboard's Storage tab. |
+| `BLOB_READ_WRITE_TOKEN` | Powers the image attachment upload on LinkedIn approval cards (`/api/upload`) — direct LinkedIn publishing fetches the image's bytes from this Blob URL and re-uploads them to LinkedIn's own Images API at publish time. Auto-injected once you add Blob storage from the Vercel dashboard's Storage tab. |
 | `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY` | From an Inngest account (app.inngest.com) — runs the agent cycle pipeline as durable background jobs instead of inline in the request. Locally, `npx inngest-cli@latest dev` works without these. |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | From an Upstash Redis database (upstash.com) — backs rate limiting and short-TTL caching. |
 | `NEXT_PUBLIC_SITE_URL` | This app's own canonical public URL (e.g. `https://orbitai.co.in`) — already used for OAuth redirect URIs; the HeyGen webhook callback (built inside a background job, with no incoming request to derive a host from) reuses this same convention rather than a separate variable. Falls back to `http://localhost:3000` if unset. |
@@ -67,22 +69,37 @@ there's no separate "direct publish" credential anymore. The same
 
 X moved to **prepaid-credits-only** pay-per-use pricing in Feb 2026 — posting costs ~$0.015/post (~$0.20 if it contains a link), reading costs ~$0.005/post and ~$0.01/user. There's no postpaid "card on file" option and no free tier — buy a credit balance in the X Developer Portal before this will work, and set a per-cycle spending cap while you're there. Direct X posting is always immediate — there's no scheduling on this path, unlike Buffer. `REPLY`-type approvals post as genuine in-thread @-replies (not standalone posts) since the real tweet being replied to is already on hand from mention discovery.
 
-## Connecting Buffer (covers LinkedIn only; X/Threads/Instagram all publish directly)
+## Connecting LinkedIn directly
 
-Buffer's API is free on every plan (including free), and it's the only path here with
-actual scheduling — approving something can queue it for later instead of posting
-immediately. It's also the only way LinkedIn publishing works at all, since there's
-no direct LinkedIn integration in this app yet.
+LinkedIn posts (`POST` approvals for the LinkedIn platform) publish straight
+to your own profile via LinkedIn's REST API, through a real per-account OAuth
+connect button in Settings — not Buffer.
 
-1. In Buffer, connect the LinkedIn channel you want to publish to — this happens in Buffer's own dashboard, not this app.
-2. Create a personal API key: profile icon → **API** (or [publish.buffer.com/settings/api](https://publish.buffer.com/settings/api)) → **Personal Access** tab → **+ New Key**. Give it all permissions and a 1-year expiry (keys aren't permanent like X's OAuth token — you'll need to regenerate this annually).
-3. Put it in `.env.local` as `BUFFER_API_KEY`.
-4. Run `npm run buffer:channels` to find the channel's id, then `npm run buffer:assign -- <email> LINKEDIN <channelId>` to link it to a customer account (see `scripts/assign-buffer-channel.ts`).
-5. Restart `npm run dev`. Settings shows per-platform connection status.
+1. Create an app at [LinkedIn Developers](https://www.linkedin.com/developers/apps) and add two self-serve products to it: **Sign In with LinkedIn using OpenID Connect** and **Share on LinkedIn**. Both grant immediately — no App Review needed to post to your own profile.
+2. In the app's **Auth** tab, add `https://<your-domain>/api/connections/linkedin/callback` as an authorized redirect URL.
+3. Copy the **Client ID**/**Client Secret** into `.env.local` as `LINKEDIN_CLIENT_ID` / `LINKEDIN_CLIENT_SECRET`.
+4. Restart `npm run dev`, go to Settings, click **Connect LinkedIn**.
 
-**Limitations to know about:** LinkedIn image attachments must be a **publicly reachable, non-expiring URL** — Buffer fetches the image at actual publish time (which can be hours later for a scheduled post), so a signed/expiring URL fails silently. That's why LinkedIn image uploads go through Vercel Blob (see Deploying) rather than any temporary storage.
+**Real limitation, not a bug:** LinkedIn only issues a programmatic *refresh*
+token to approved Marketing Developer Platform partners — not available on
+this self-serve setup. The access token lasts 60 days with no way to
+silently renew it; once it expires, Settings shows LinkedIn as "Not
+connected" again and you just click **Connect LinkedIn** (really
+Reconnect) once more. There's nothing to monitor for this — it fails safe,
+the same as never having connected.
 
-**What's live vs. simulated right now:** approving a `POST` publishes for real once that platform is connected (X/Threads/Instagram directly, LinkedIn via Buffer). Approving a `REPLY` posts a genuine in-thread @-reply once X is connected — `discoverMentions()` (`lib/agents/discover-mentions.ts`) pulls real mentions and keyword matches via that same connection, not mock data. Nothing auto-posts — every item sits in the queue until you explicitly approve it.
+An optional image attachment on a LinkedIn approval card uploads through
+LinkedIn's own Images API (fetch the bytes from Vercel Blob, then re-upload
+them to LinkedIn — LinkedIn's Posts API won't accept an arbitrary external
+URL directly).
+
+**What's live vs. simulated right now:** approving a `POST` publishes for
+real once that platform is connected (X, Threads, Instagram, and LinkedIn
+all publish directly — nothing goes through Buffer anymore). Approving a
+`REPLY` posts a genuine in-thread @-reply once X is connected —
+`discoverMentions()` (`lib/agents/discover-mentions.ts`) pulls real mentions
+and keyword matches via that same connection, not mock data. Nothing
+auto-posts — every item sits in the queue until you explicitly approve it.
 
 ## Connecting Instagram directly (for Reels/Carousels — not Buffer)
 
@@ -141,12 +158,13 @@ per-user accounts yet.
    Environment Variables: `GROQ_API_KEY`, `DASHBOARD_PASSWORD` (pick a
    real one — not `changeme`), `SESSION_SECRET` (a long random string — e.g.
    `openssl rand -hex 32`), `CRON_SECRET` (another random string — Vercel
-   needs this to authorize its own daily trigger), `BUFFER_API_KEY` plus
-   whichever `BUFFER_*_CHANNEL_ID` variables you've connected, and the four
-   `X_*` variables if you've connected X directly. Paste raw values only —
-   no surrounding quote marks, unlike `.env.local`.
-5. **Add Blob storage** from the Storage tab (needed for LinkedIn image
-   uploads) — auto-injects `BLOB_READ_WRITE_TOKEN`. Skip if not using LinkedIn yet.
+   needs this to authorize its own daily trigger), and whichever of the
+   `X_*`, `INSTAGRAM_*`, `THREADS_*`, `LINKEDIN_*` variable pairs you've
+   connected directly. Paste raw values only — no surrounding quote marks,
+   unlike `.env.local`.
+5. **Add Blob storage** from the Storage tab (needed for image attachments
+   on LinkedIn approval cards) — auto-injects `BLOB_READ_WRITE_TOKEN`. Skip
+   if not using LinkedIn yet.
 6. **Generate the first Postgres migration.** This has to happen once, from
    your machine, against the real database — I can't do it without your DB
    credentials, and Vercel's build step only *applies* migrations, it

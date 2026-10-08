@@ -6,17 +6,21 @@ import { BufferPlatform, BufferAsset, isBufferConfiguredForPlatform, schedulePos
 import { isInstagramConnected } from "@/lib/publishing/instagram-client";
 import { isThreadsConnected } from "@/lib/publishing/threads-client";
 import { isXConnected, publishPostToX } from "@/lib/publishing/x-client";
+import { isLinkedInConnected, publishPostToLinkedIn } from "@/lib/publishing/linkedin-client";
 import { inngest, INSTAGRAM_PUBLISH_REQUESTED, THREADS_PUBLISH_REQUESTED } from "@/lib/inngest/client";
 
 type Action = "approve" | "reject" | "edit";
 
-// Instagram, Threads, and X all publish directly now (lib/publishing/
-// instagram-client.ts, threads-client.ts, x-client.ts) — Buffer only
-// covers LinkedIn, since there's no direct LinkedIn integration here.
-const BUFFER_PLATFORMS: BufferPlatform[] = ["LINKEDIN"];
+// Instagram, Threads, X, and now LinkedIn all publish directly (lib/publishing/
+// instagram-client.ts, threads-client.ts, x-client.ts, linkedin-client.ts) —
+// Buffer currently has no platform left to serve. Kept as an empty list
+// rather than ripped out: the Buffer code path itself still works fine if a
+// platform ever needs to move back onto it, no code change required, just
+// adding it back here.
+const BUFFER_PLATFORMS: BufferPlatform[] = [];
 
 interface LivePublishResult {
-  publishedVia: "BUFFER" | "X";
+  publishedVia: "BUFFER" | "X" | "LINKEDIN";
   platformPostId: string;
   publishedUrl: string | null;
   scheduledFor: Date | null;
@@ -126,6 +130,25 @@ export const PATCH = withAuth<{ params: Promise<{ id: string }> }>(async (reques
         };
       } catch (err) {
         return NextResponse.json({ error: `Failed to publish to X: ${String(err)}` }, { status: 502 });
+      }
+    }
+
+    // LinkedIn publishes directly too — a single immediate API call like
+    // X's, so stays synchronous. finalImageUrl is the same user-attached
+    // (never AI-generated) image this route already supported for
+    // Buffer's LinkedIn path; publishPostToLinkedIn handles uploading it to
+    // LinkedIn's own asset storage when present.
+    if (!livePublish && approval.platform === "LINKEDIN" && (await isLinkedInConnected(currentUser.accountId))) {
+      try {
+        const result = await publishPostToLinkedIn(currentUser.accountId, finalContent, finalImageUrl);
+        livePublish = {
+          publishedVia: "LINKEDIN",
+          platformPostId: result.platformPostId,
+          publishedUrl: result.url,
+          scheduledFor: null,
+        };
+      } catch (err) {
+        return NextResponse.json({ error: `Failed to publish to LinkedIn: ${String(err)}` }, { status: 502 });
       }
     }
 
