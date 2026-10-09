@@ -46,8 +46,10 @@ export const GET = withIpRateLimit(instagramCallbackLimiter, async (request: Nex
 
   try {
     // Step 1: code -> short-lived token. This specific endpoint wants
-    // form-encoded body, not JSON, and wraps its response in a `data` array
-    // — both confirmed against Meta's current docs, not the usual OAuth2 shape.
+    // form-encoded body, not JSON. Meta's own docs show the response
+    // wrapped in a `data` array, but in practice (confirmed against a real
+    // response) it can come back as a flat object instead — handle both
+    // rather than trusting the docs' shape alone.
     const shortLivedRes = await fetch("https://api.instagram.com/oauth/access_token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -60,7 +62,7 @@ export const GET = withIpRateLimit(instagramCallbackLimiter, async (request: Nex
       }),
     });
     const shortLivedBody = await shortLivedRes.json().catch(() => null);
-    const shortLivedToken = shortLivedBody?.data?.[0]?.access_token;
+    const shortLivedToken = shortLivedBody?.data?.[0]?.access_token ?? shortLivedBody?.access_token;
     if (!shortLivedRes.ok || typeof shortLivedToken !== "string") {
       throw new Error(`Code exchange failed: ${JSON.stringify(shortLivedBody)}`);
     }
