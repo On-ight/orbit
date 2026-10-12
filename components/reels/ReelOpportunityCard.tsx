@@ -15,6 +15,7 @@ interface HeygenAvatar {
   name: string;
   previewImageUrl: string;
   ready: boolean;
+  source: "mine" | "stock";
 }
 
 interface ReelScriptVersion {
@@ -225,39 +226,62 @@ export function ReelOpportunityCard({ trend, disabled }: { trend: TrendSummary; 
             )}
             {avatars && avatars.length === 0 && (
               <p className="text-xs text-[var(--text-muted)]">
-                No HeyGen avatar configured yet — create a digital twin on your HeyGen account first.
+                No avatars available right now — try again shortly.
               </p>
             )}
             {avatars && avatars.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {avatars.map((avatar) => (
-                  <button
-                    key={avatar.id}
-                    type="button"
-                    disabled={!avatar.ready}
-                    onClick={() => setSelectedAvatarId(avatar.id)}
-                    title={avatar.ready ? undefined : "Still processing on HeyGen — not ready yet"}
-                    className="flex items-center gap-2 rounded-md border px-2 py-1.5 text-left text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
-                    style={
-                      selectedAvatarId === avatar.id
-                        ? { borderColor: "var(--accent)", background: "var(--accent-soft)", color: "var(--accent)" }
-                        : { borderColor: "var(--border)", color: "var(--text-secondary)" }
-                    }
-                  >
-                    {avatar.previewImageUrl && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={avatar.previewImageUrl}
-                        alt={avatar.name}
-                        width={32}
-                        height={32}
-                        className="h-8 w-8 rounded-full border border-[var(--border)] object-cover"
-                      />
-                    )}
-                    {avatar.name}
-                    {!avatar.ready && " (processing)"}
-                  </button>
-                ))}
+              <div className="space-y-3">
+                {([
+                  { key: "mine" as const, label: "Your avatars" },
+                  { key: "stock" as const, label: "HeyGen stock avatars" },
+                ] as const).map(({ key, label }) => {
+                  const group = avatars.filter((a) => a.source === key);
+                  if (group.length === 0) {
+                    return key === "mine" ? (
+                      <p key={key} className="text-xs text-[var(--text-muted)]">
+                        No cloned avatar yet — create a digital twin on your HeyGen account, or pick a
+                        stock avatar below.
+                      </p>
+                    ) : null;
+                  }
+                  return (
+                    <div key={key}>
+                      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                        {label}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {group.map((avatar) => (
+                          <button
+                            key={avatar.id}
+                            type="button"
+                            disabled={!avatar.ready}
+                            onClick={() => setSelectedAvatarId(avatar.id)}
+                            title={avatar.ready ? undefined : "Still processing on HeyGen — not ready yet"}
+                            className="flex items-center gap-2 rounded-md border px-2 py-1.5 text-left text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
+                            style={
+                              selectedAvatarId === avatar.id
+                                ? { borderColor: "var(--accent)", background: "var(--accent-soft)", color: "var(--accent)" }
+                                : { borderColor: "var(--border)", color: "var(--text-secondary)" }
+                            }
+                          >
+                            {avatar.previewImageUrl && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={avatar.previewImageUrl}
+                                alt={avatar.name}
+                                width={32}
+                                height={32}
+                                className="h-8 w-8 rounded-full border border-[var(--border)] object-cover"
+                              />
+                            )}
+                            {avatar.name}
+                            {!avatar.ready && " (processing)"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

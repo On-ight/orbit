@@ -4,8 +4,9 @@ import { defaultCrudLimiter } from "@/lib/redis/rate-limit";
 import { listHeygenAvatars } from "@/lib/reels/heygen-client";
 
 // Backs the avatar picker on the Reel-generation flow — lists the account's
-// own HeyGen digital twins live, so it naturally has one entry today and
-// more later with zero code changes once more avatars are created.
+// own HeyGen digital twins live, plus HeyGen's premade stock presenters as
+// an alternative, so there's always something to pick even before any
+// digital twin has been created.
 export const GET = withAuth(
   async () => {
     try {
