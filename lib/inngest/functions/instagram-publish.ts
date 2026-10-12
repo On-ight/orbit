@@ -35,7 +35,7 @@ export const instagramPublishFn = inngest.createFunction(
     triggers: [{ event: INSTAGRAM_PUBLISH_REQUESTED }],
   },
   async ({ event, step }) => {
-    const { accountId, approvalId } = event.data as InstagramPublishRequestedData;
+    const { accountId, approvalId, scheduledFor } = event.data as InstagramPublishRequestedData;
 
     try {
       const approval = await step.run("load-approval", () =>
@@ -48,6 +48,14 @@ export const instagramPublishFn = inngest.createFunction(
         }),
       );
       if (!approval) throw new Error(`Approval ${approvalId} not found`);
+
+      // Durable sleep, not a busy-wait — Inngest suspends this run entirely
+      // and resumes it at the right time, so a schedule days out costs
+      // nothing while waiting. Everything after this (auth, containers)
+      // runs fresh at the actual publish time, not at approval time.
+      if (scheduledFor) {
+        await step.sleepUntil("wait-for-scheduled-time", new Date(scheduledFor));
+      }
 
       const auth = await getInstagramAuth(accountId);
       if (!auth) throw new Error(`Account ${accountId} has no Instagram connection`);

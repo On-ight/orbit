@@ -110,7 +110,7 @@ export function ApprovalCard({
           editedContent: action !== "reject" && draft !== approval.content ? draft : undefined,
           imageUrl: action !== "reject" && imageUrl !== (approval.imageUrl ?? "") ? imageUrl : undefined,
           scheduledFor:
-            action === "approve" && bufferConfigured && scheduledFor
+            action === "approve" && canSchedule && scheduledFor
               ? new Date(scheduledFor).toISOString()
               : undefined,
         }),
@@ -139,6 +139,11 @@ export function ApprovalCard({
     (isThreads && threadsConnected) ||
     (isX && xConnected) ||
     (isLinkedIn && linkedinConnected);
+  // Instagram's publish is already async (an Inngest job, not an immediate
+  // call) — see lib/inngest/functions/instagram-publish.ts — so it can
+  // delay its own start with step.sleepUntil the same way Buffer's
+  // scheduling already worked, without needing a different mechanism.
+  const canSchedule = bufferConfigured || (isInstagram && instagramConnected);
   const overLimit = editing ? draft.length > limit : displayContent.length > limit;
 
   function publishNote(): string {
@@ -153,7 +158,9 @@ export function ApprovalCard({
         : "Approving this will publish it directly to X.";
     }
     if (isInstagram && instagramConnected) {
-      return "Approving this will publish it directly to Instagram — this can take a few minutes while Instagram processes it.";
+      return scheduledFor
+        ? `Approving this will publish it directly to Instagram at ${new Date(scheduledFor).toLocaleString()}.`
+        : "Approving this will publish it directly to Instagram — this can take a few minutes while Instagram processes it.";
     }
     if (isThreads && threadsConnected) {
       return "Approving this will publish it directly to Threads shortly.";
@@ -309,7 +316,7 @@ export function ApprovalCard({
         {publishNote()}
       </p>
 
-      {bufferConfigured && !editing && (
+      {canSchedule && !editing && (
         <label className="mb-4 block text-xs text-[var(--text-muted)]">
           Schedule for (optional — leave blank to queue immediately)
           <input

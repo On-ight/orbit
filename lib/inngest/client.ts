@@ -40,6 +40,10 @@ export const INSTAGRAM_PUBLISH_REQUESTED = "instagram/publish.requested" as cons
 export interface InstagramPublishRequestedData {
   accountId: string;
   approvalId: string;
+  // ISO string, optional — when set, lib/inngest/functions/instagram-publish.ts
+  // sleeps until this time (via step.sleepUntil) before actually creating
+  // containers, rather than publishing immediately on approval.
+  scheduledFor?: string;
 }
 
 // Sent by app/api/approvals/[id]/route.ts when a Threads post gets approved

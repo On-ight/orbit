@@ -122,6 +122,12 @@ after Inngest was already synced once, you need to manually re-sync** (Inngest
 dashboard → Apps → your app → Sync) or events for it will be silently
 dropped — this bit Reels earlier for the exact same reason.
 
+Reels/Carousels can also be **scheduled** for a future time instead of
+publishing right away — the same "Schedule for" picker Buffer approvals
+show, now also shown for Instagram items once connected. Under the hood
+this is a durable `step.sleepUntil` inside the Inngest function, not a
+separate cron — it costs nothing while waiting, even for a schedule days out.
+
 ## Connecting Threads directly (not Buffer)
 
 Same deal as Instagram — Threads posts (`POST` approvals for the Threads

@@ -165,7 +165,11 @@ export const PATCH = withAuth<{ params: Promise<{ id: string }> }>(async (reques
       asyncDirectPublish = true;
       await inngest.send({
         name: INSTAGRAM_PUBLISH_REQUESTED,
-        data: { accountId: currentUser.accountId, approvalId: id },
+        data: {
+          accountId: currentUser.accountId,
+          approvalId: id,
+          scheduledFor: scheduledForInput?.toISOString(),
+        },
       });
     } else if (approval.platform === "THREADS" && (await isThreadsConnected(currentUser.accountId))) {
       asyncDirectPublish = true;
@@ -174,6 +178,15 @@ export const PATCH = withAuth<{ params: Promise<{ id: string }> }>(async (reques
         data: { accountId: currentUser.accountId, approvalId: id },
       });
     }
+
+    // Instagram is the only async-publish platform that supports scheduling
+    // right now (Threads/X/LinkedIn don't expose a scheduling input in the
+    // UI) — livePublish never carries a scheduledFor for Instagram since
+    // it's never "live" synchronously, so it's folded in separately here
+    // purely so the approval queue can display when it's actually due.
+    const displayScheduledFor =
+      livePublish?.scheduledFor ??
+      (asyncDirectPublish && approval.platform === "INSTAGRAM" ? scheduledForInput ?? null : null);
 
     const updated = await prisma.approval.update({
       where: { id },
@@ -185,7 +198,7 @@ export const PATCH = withAuth<{ params: Promise<{ id: string }> }>(async (reques
         publishedVia: livePublish?.publishedVia,
         platformPostId: livePublish?.platformPostId,
         publishedUrl: livePublish?.publishedUrl,
-        scheduledFor: livePublish?.scheduledFor,
+        scheduledFor: displayScheduledFor,
       },
     });
 
