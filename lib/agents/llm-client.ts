@@ -1,4 +1,5 @@
 import Groq, { BadRequestError } from "groq-sdk";
+import type { ChatCompletionCreateParamsNonStreaming } from "groq-sdk/resources/chat/completions";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 
@@ -10,15 +11,47 @@ export const LLM_MODEL = "openai/gpt-oss-120b";
 // research call below. Browser search is only available on the gpt-oss family.
 const WEB_SEARCH_MODEL = "openai/gpt-oss-120b";
 
-let client: Groq | null = null;
+let primaryClient: Groq | null = null;
+let secondaryClient: Groq | null = null;
 
 function getClient(): Groq {
-  if (!client) {
+  if (!primaryClient) {
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) throw new Error("GROQ_API_KEY is not set");
-    client = new Groq({ apiKey, maxRetries: 2 });
+    primaryClient = new Groq({ apiKey, maxRetries: 2 });
   }
-  return client;
+  return primaryClient;
+}
+
+// GROQ_API_KEY_2 is optional — a second Groq account/org with its own
+// independent quota, not a higher limit on the same key. Only ever reached
+// via createChatCompletion below, after the primary key hits a real
+// RateLimitError (daily/per-minute token cap, not a bad request).
+function getSecondaryClient(): Groq | null {
+  if (secondaryClient) return secondaryClient;
+  const apiKey = process.env.GROQ_API_KEY_2;
+  if (!apiKey) return null;
+  secondaryClient = new Groq({ apiKey, maxRetries: 2 });
+  return secondaryClient;
+}
+
+/**
+ * Shared by callStructuredCompletion and researchWithWebSearch so both get
+ * the same fallback behavior: try GROQ_API_KEY first, and if that key's own
+ * quota is exhausted (RateLimitError specifically — not a bad request or
+ * any other failure) and GROQ_API_KEY_2 is configured, retry the identical
+ * request against that second key instead of failing the whole call.
+ */
+async function createChatCompletion(
+  request: ChatCompletionCreateParamsNonStreaming,
+): Promise<Groq.Chat.ChatCompletion> {
+  try {
+    return await getClient().chat.completions.create(request);
+  } catch (err) {
+    const secondary = err instanceof Groq.RateLimitError ? getSecondaryClient() : null;
+    if (!secondary) throw err;
+    return await secondary.chat.completions.create(request);
+  }
 }
 
 // Brand-agnostic — applies to every tenant regardless of what business they
@@ -126,8 +159,6 @@ interface StructuredCallArgs<T> {
  * per-item isolation and failing safe on risk classification.
  */
 export async function callStructuredCompletion<T>(args: StructuredCallArgs<T>): Promise<T> {
-  const groq = getClient();
-
   const request = {
     model: LLM_MODEL,
     max_completion_tokens: args.maxTokens ?? 1024,
@@ -150,16 +181,17 @@ export async function callStructuredCompletion<T>(args: StructuredCallArgs<T>): 
 
   let response;
   try {
-    response = await groq.chat.completions.create(request);
+    response = await createChatCompletion(request);
   } catch (err) {
     // A forced tool_choice can still fail with a 400 "did not call a tool"
     // when the model responds in prose instead — probabilistic model
     // behavior, not a transient infra issue, so retrying the identical
     // request once is a real (not wasted) second attempt. Excludes
-    // RateLimitError deliberately: retrying an exhausted quota immediately
-    // can't succeed and just wastes the attempt.
+    // RateLimitError deliberately: that's already handled inside
+    // createChatCompletion by switching to GROQ_API_KEY_2, not by retrying
+    // the same exhausted key.
     if (err instanceof BadRequestError) {
-      response = await groq.chat.completions.create(request);
+      response = await createChatCompletion(request);
     } else {
       throw err;
     }
@@ -197,9 +229,7 @@ interface WebSearchArgs {
  * "nothing found this cycle."
  */
 export async function researchWithWebSearch(args: WebSearchArgs): Promise<string | null> {
-  const groq = getClient();
-
-  const response = await groq.chat.completions.create({
+  const response = await createChatCompletion({
     model: WEB_SEARCH_MODEL,
     max_completion_tokens: 2048,
     messages: [

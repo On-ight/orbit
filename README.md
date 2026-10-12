@@ -39,6 +39,7 @@ Open [http://localhost:3000](http://localhost:3000). You'll be redirected to
 | `DATABASE_URL` | Pooled Postgres connection string |
 | `DATABASE_URL_UNPOOLED` | Direct Postgres connection string, used only for running migrations |
 | `GROQ_API_KEY` | Powers the three agents. Without it, agent runs still complete but every item fails safe to the flagged/`NEVER` risk tier (see Settings page). |
+| `GROQ_API_KEY_2` | Optional. A second Groq account/org's key — if the primary key hits a `RateLimitError` (its own daily/per-minute quota, shared across every Groq call in the app), `lib/agents/llm-client.ts` automatically retries the identical request against this key instead of failing. Not a higher limit on the same key; a genuinely separate account. |
 | `DASHBOARD_PASSWORD` | Shared password gating the whole app — change this before sharing the URL with anyone |
 | `SESSION_SECRET` | Signs the session cookie — use a long random string before deploying anywhere real |
 | `X_CLIENT_ID`, `X_CLIENT_SECRET` | OAuth 2.0 + PKCE app credentials from the X Developer Portal — powers the per-account "Connect X" button in Settings, used for both reading mentions and publishing directly (one connection, not two). See below. |
