@@ -2,7 +2,9 @@ import { z } from "zod";
 import pLimit from "p-limit";
 import { prisma } from "@/lib/db/prisma";
 import { callStructuredCompletion, buildSystemPrompt } from "@/lib/agents/llm-client";
-import { activeBufferPlatforms, isBufferConfigured } from "@/lib/publishing/buffer-client";
+import { isXConnected } from "@/lib/publishing/x-client";
+import { isThreadsConnected } from "@/lib/publishing/threads-client";
+import { isLinkedInConnected } from "@/lib/publishing/linkedin-client";
 import { PLATFORM_CHAR_LIMITS as PLATFORM_LIMITS, type Platform } from "@/lib/types";
 import { limitsForTier } from "@/lib/billing/plan-limits";
 import { countAiGenerationsThisMonth } from "@/lib/billing/usage";
@@ -141,9 +143,11 @@ platform's draft gets rejected outright and doesn't get published at all.`,
  *
  * One trend -> one Post + one Approval per connected platform (not one shared
  * row) — Post.sourceTrendId is already one-to-many and platform already
- * exists on both models, so this needed no relation changes. If Buffer isn't
- * configured for any platform, this falls back to exactly the original
- * behavior: X-only, via the direct X posting path in the approvals route.
+ * exists on both models, so this needed no relation changes. Drafts one
+ * variant for each of X/Threads/LinkedIn that this account has actually
+ * connected directly (see lib/publishing/{x,threads,linkedin}-client.ts) —
+ * none of the three go through Buffer anymore. If none are connected yet,
+ * this is a no-op.
  */
 export async function runContentAgentOnTrend(accountId: string, trendId: string): Promise<ContentAgentItemResult> {
   const trend = await prisma.trendInput.findUnique({
@@ -155,12 +159,23 @@ export async function runContentAgentOnTrend(accountId: string, trendId: string)
 
   const existingPlatforms = new Set(trend.posts.map((p) => p.platform));
 
-  const bufferConfigured = await isBufferConfigured(accountId);
-  const targetPlatforms: Platform[] = bufferConfigured
-    ? (await activeBufferPlatforms(accountId)).filter((p) => !existingPlatforms.has(p))
-    : existingPlatforms.has("X")
-      ? []
-      : ["X"];
+  // X, Threads, and LinkedIn all publish directly now (none of them go
+  // through Buffer anymore — see lib/publishing/{x,threads,linkedin}-client.ts)
+  // so target platforms are whichever of those three this account has
+  // actually connected, not whichever has a Buffer channel configured
+  // (that check now always returns false/empty, which used to silently
+  // collapse this to "X only" regardless of what was really connected).
+  const [xConnected, threadsConnected, linkedinConnected] = await Promise.all([
+    isXConnected(accountId),
+    isThreadsConnected(accountId),
+    isLinkedInConnected(accountId),
+  ]);
+  const connectedPlatforms: Platform[] = [
+    ...(xConnected ? (["X"] as const) : []),
+    ...(threadsConnected ? (["THREADS"] as const) : []),
+    ...(linkedinConnected ? (["LINKEDIN"] as const) : []),
+  ];
+  const targetPlatforms = connectedPlatforms.filter((p) => !existingPlatforms.has(p));
 
   if (targetPlatforms.length === 0) return { trendId, ok: true };
 
