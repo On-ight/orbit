@@ -7,6 +7,7 @@ import { runCommunityAgent } from "@/lib/agents/community-agent";
 import { inngest, AGENT_CYCLE_REQUESTED, type AgentCycleRequestedData } from "@/lib/inngest/client";
 import { limitsForTier } from "@/lib/billing/plan-limits";
 import { isTrialExpired, expireTrialForAccount } from "@/lib/billing/trial";
+import { sendRunCompletedEmail } from "@/lib/notifications/email";
 
 /**
  * Durable replacement for lib/agents/run-cycle.ts's runAgentCycle(): same 5
@@ -154,6 +155,20 @@ export const agentCycleFn = inngest.createFunction(
     await step.run("finalize-agent-run", () =>
       prisma.agentRun.update({ where: { id: run.id }, data: { status, summary, completedAt: new Date() } }),
     );
+
+    // Best-effort, deliberately swallowed — a notification failing must
+    // never retry or fail the cycle that already completed successfully.
+    // Not sent for the two early "Skipped — ..." finalize paths above
+    // (inactive account, no knowledge base yet) since those happen before
+    // any real agent work and would just be daily noise for an account
+    // nobody's actively using yet.
+    await step.run("send-run-completed-email", async () => {
+      try {
+        await sendRunCompletedEmail({ accountId, status, summary });
+      } catch (err) {
+        console.error(`Failed to send run-completed email for run ${run.id}:`, err);
+      }
+    });
 
     return { agentRunId: run.id, status, summary };
   },

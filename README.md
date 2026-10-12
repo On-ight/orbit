@@ -53,6 +53,8 @@ Open [http://localhost:3000](http://localhost:3000). You'll be redirected to
 | `HEYGEN_API_KEY` | From a HeyGen account (heygen.com) — generates the AI-avatar Reel videos (avatar, voice, and captions all in one call). Also backs the avatar picker on the Reel-generation flow, which lists the account's own digital-twin avatars live via `GET /v3/avatars/looks` — create at least one digital twin on your HeyGen account before generating a Reel. |
 | `HEYGEN_WEBHOOK_SECRET` | Random string appended to the webhook callback URL as `?secret=` — HeyGen calls this route with no session, so this is the payload-authenticity check. |
 | `UNSPLASH_ACCESS_KEY` | Free Unsplash developer app access key (unsplash.com/developers) — backs Carousel slide background photos. Optional: without it, Carousels still render, just with the plain gradient look instead of a photo per slide. Demo apps are capped at 50 requests/hour. |
+| `RESEND_API_KEY` | From a free Resend account (resend.com) — sends the "agent run completed/failed" email after each cycle. Optional: without it, runs still complete normally, the email step is just a silent no-op. |
+| `RESEND_FROM_EMAIL` | Optional. The verified sender address once you've verified your own domain in Resend (e.g. `Orbit <notifications@orbitai.co.in>`). Without it, falls back to Resend's shared test sender (`onboarding@resend.dev`), which only delivers to the Resend account's own owner — fine for trying this out, not for real users. |
 | `INSTAGRAM_CLIENT_ID`, `INSTAGRAM_CLIENT_SECRET` | From a Meta Developer App's Instagram product (Instagram API with Instagram Login) — powers direct Instagram publishing for Reels/Carousels. See below. |
 | `THREADS_APP_ID`, `THREADS_APP_SECRET` | From the same Meta Developer App's Threads product — a separate credential pair from Instagram's even though it's one app; Threads' endpoints reject the Instagram pair outright. Powers direct Threads publishing. See below. |
 
@@ -227,6 +229,14 @@ the whole "login system" for now.
 - **Knowledge base grounds everything.** Settings → Knowledge base holds the
   brand voice, content pillars, safety rules, and product status that shape
   both trend research and drafting — editable there without a redeploy.
+- **Run completions notify you two ways.** `lib/notifications/email.ts` emails
+  every user on the account (subject + the same summary line shown in
+  Settings → Recent runs) once a cycle finishes — a silent no-op if
+  `RESEND_API_KEY` isn't set. Separately, `components/dashboard/RunNotifier.tsx`
+  polls `/api/runs/latest` every 20s from the browser and pops a dismissible
+  toast top-right the moment a new run completes — there's no websocket/SSE
+  infra behind this, it's short-interval polling, "real-time" in the
+  practical sense of a dashboard tab left open, not a true push.
 - **Mock data stands in for X mentions.** `lib/db/seed-data/` holds seeded
   mentions for Community Agent (replies) — there's no live mentions feed yet,
   so replies stay simulated regardless of publishing connection. `npm run

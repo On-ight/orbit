@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/nav/Sidebar";
 import { ThemeToggle } from "@/components/dashboard/ThemeToggle";
+import { RunNotifier } from "@/components/dashboard/RunNotifier";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/db/prisma";
 
@@ -32,6 +33,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="flex min-h-screen bg-[var(--page-plane)]">
+      <RunNotifier />
       <Sidebar />
       <div className="flex-1">
         <header className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--surface-1)] px-6 py-3">

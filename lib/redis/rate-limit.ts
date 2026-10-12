@@ -57,6 +57,15 @@ export const defaultCrudLimiter = new Ratelimit({
   prefix: "ratelimit:crud",
 });
 
+// Polled client-side by components/dashboard/RunNotifier.tsx every ~20s —
+// generous enough for a few browser tabs open at once without needing a
+// per-tab backoff.
+export const runsPollLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(20, "60 s"),
+  prefix: "ratelimit:runs-poll",
+});
+
 // Costlier than plain CRUD — an external fetch plus an LLM call.
 export const extractLimiter = new Ratelimit({
   redis,
