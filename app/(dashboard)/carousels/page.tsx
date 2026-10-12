@@ -1,9 +1,11 @@
 import { prisma } from "@/lib/db/prisma";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { CarouselOpportunityCard } from "@/components/carousels/CarouselOpportunityCard";
+import { ApprovalCard } from "@/components/approvals/ApprovalCard";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { limitsForTier } from "@/lib/billing/plan-limits";
 import { countCarouselsThisMonth } from "@/lib/billing/usage";
+import { isInstagramConnected } from "@/lib/publishing/instagram-client";
 import { REEL_MODE_LABELS, type ReelMode } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +32,7 @@ export default async function CarouselsPage() {
   const currentUser = await requireCurrentUser();
   const { accountId } = currentUser;
 
-  const [opportunities, carousels, carouselsUsed] = await Promise.all([
+  const [opportunities, carousels, carouselsUsed, instagramConnected] = await Promise.all([
     // Same shared trend pool Reels draws opportunities from, deduped
     // independently — a trend already turned into a Reel can still become a
     // Carousel, and vice versa.
@@ -41,7 +43,25 @@ export default async function CarouselsPage() {
     }),
     prisma.carousel.findMany({ where: { accountId }, orderBy: { createdAt: "desc" }, take: 20 }),
     countCarouselsThisMonth(accountId),
+    isInstagramConnected(accountId),
   ]);
+
+  // A READY carousel has exactly one pending Approval row — fetched here so
+  // this page can show the real ApprovalCard (caption editing, Approve/
+  // Reject) instead of just a bare status line, same card already used on
+  // /approvals.
+  const pendingApprovals = await prisma.approval.findMany({
+    where: {
+      accountId,
+      carouselId: { in: carousels.map((c) => c.id) },
+      status: { in: ["PENDING", "EDITED"] },
+    },
+    include: {
+      reel: { select: { videoUrl: true, hashtags: true } },
+      carousel: { select: { slideImageUrls: true, hashtags: true } },
+    },
+  });
+  const approvalByCarouselId = new Map(pendingApprovals.map((a) => [a.carouselId as string, a]));
 
   const limits = limitsForTier(currentUser.account.planTier);
   const quotaReached = carouselsUsed >= limits.carouselsPerMonth;
@@ -82,24 +102,56 @@ export default async function CarouselsPage() {
           </p>
         ) : (
           <div className="space-y-3">
-            {carousels.map((carousel) => (
-              <div key={carousel.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-4">
-                <div className="mb-1 flex items-center justify-between">
-                  <span className="text-sm font-medium text-[var(--text-primary)]">
-                    {carousel.title ?? "Untitled Carousel"}
-                  </span>
-                  <span
-                    className="text-xs font-medium"
-                    style={{ color: STATUS_COLOR[carousel.status] ?? "var(--text-muted)" }}
-                  >
-                    {STATUS_LABEL[carousel.status] ?? carousel.status}
-                  </span>
+            {carousels.map((carousel) => {
+              const approval = approvalByCarouselId.get(carousel.id);
+              if (approval) {
+                return (
+                  <ErrorBoundary key={carousel.id} label="this Carousel's approval card">
+                    <ApprovalCard
+                      bufferPlatforms={[]}
+                      instagramConnected={instagramConnected}
+                      threadsConnected={false}
+                      xConnected={false}
+                      linkedinConnected={false}
+                      approval={{
+                        ...approval,
+                        createdAt: approval.createdAt.toISOString(),
+                        conversation: null,
+                        reel: null,
+                        // slideImageUrls is a Json column — always written as
+                        // string[] by app/api/carousels/[id]/select-version/
+                        // route.ts, cast here rather than widened throughout
+                        // the UI (same reasoning as app/(dashboard)/approvals/page.tsx).
+                        carousel: approval.carousel
+                          ? {
+                              slideImageUrls: approval.carousel.slideImageUrls as string[] | null,
+                              hashtags: approval.carousel.hashtags,
+                            }
+                          : null,
+                      }}
+                    />
+                  </ErrorBoundary>
+                );
+              }
+              return (
+                <div key={carousel.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-4">
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="text-sm font-medium text-[var(--text-primary)]">
+                      {carousel.title ?? "Untitled Carousel"}
+                    </span>
+                    <span
+                      className="text-xs font-medium"
+                      style={{ color: STATUS_COLOR[carousel.status] ?? "var(--text-muted)" }}
+                    >
+                      {STATUS_LABEL[carousel.status] ?? carousel.status}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    {REEL_MODE_LABELS[carousel.mode as ReelMode] ?? carousel.mode}
+                  </p>
                 </div>
-                <p className="text-xs text-[var(--text-muted)]">
-                  {REEL_MODE_LABELS[carousel.mode as ReelMode] ?? carousel.mode}
-                </p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>

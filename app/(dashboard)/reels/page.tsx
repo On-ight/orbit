@@ -1,9 +1,11 @@
 import { prisma } from "@/lib/db/prisma";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { ReelOpportunityCard } from "@/components/reels/ReelOpportunityCard";
+import { ApprovalCard } from "@/components/approvals/ApprovalCard";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { limitsForTier } from "@/lib/billing/plan-limits";
 import { countReelsThisMonth } from "@/lib/billing/usage";
+import { isInstagramConnected } from "@/lib/publishing/instagram-client";
 import { REEL_MODE_LABELS, type ReelMode } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +32,7 @@ export default async function ReelsPage() {
   const currentUser = await requireCurrentUser();
   const { accountId } = currentUser;
 
-  const [opportunities, reels, reelsUsed] = await Promise.all([
+  const [opportunities, reels, reelsUsed, instagramConnected] = await Promise.all([
     // A Reel opportunity is any AUTO-tier, already-summarized trend that
     // hasn't been turned into a Reel yet — no separate detection agent, just
     // a query against data the Trend Agent already produced.
@@ -41,7 +43,26 @@ export default async function ReelsPage() {
     }),
     prisma.reel.findMany({ where: { accountId }, orderBy: { createdAt: "desc" }, take: 20 }),
     countReelsThisMonth(accountId),
+    isInstagramConnected(accountId),
   ]);
+
+  // A READY reel has exactly one pending Approval row (lib/inngest/functions/
+  // reel-pipeline.ts creates it once rendering finishes) — fetched here so
+  // this page can show the real ApprovalCard (caption editing, Approve/
+  // Reject) instead of just a bare status line, same card already used on
+  // /approvals.
+  const pendingApprovals = await prisma.approval.findMany({
+    where: {
+      accountId,
+      reelId: { in: reels.map((r) => r.id) },
+      status: { in: ["PENDING", "EDITED"] },
+    },
+    include: {
+      reel: { select: { videoUrl: true, hashtags: true } },
+      carousel: { select: { slideImageUrls: true, hashtags: true } },
+    },
+  });
+  const approvalByReelId = new Map(pendingApprovals.map((a) => [a.reelId as string, a]));
 
   const limits = limitsForTier(currentUser.account.planTier);
   const quotaReached = reelsUsed >= limits.reelsPerMonth;
@@ -84,24 +105,46 @@ export default async function ReelsPage() {
           </p>
         ) : (
           <div className="space-y-3">
-            {reels.map((reel) => (
-              <div key={reel.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-4">
-                <div className="mb-1 flex items-center justify-between">
-                  <span className="text-sm font-medium text-[var(--text-primary)]">
-                    {reel.title ?? "Untitled Reel"}
-                  </span>
-                  <span
-                    className="text-xs font-medium"
-                    style={{ color: STATUS_COLOR[reel.status] ?? "var(--text-muted)" }}
-                  >
-                    {STATUS_LABEL[reel.status] ?? reel.status}
-                  </span>
+            {reels.map((reel) => {
+              const approval = approvalByReelId.get(reel.id);
+              if (approval) {
+                return (
+                  <ErrorBoundary key={reel.id} label="this Reel's approval card">
+                    <ApprovalCard
+                      bufferPlatforms={[]}
+                      instagramConnected={instagramConnected}
+                      threadsConnected={false}
+                      xConnected={false}
+                      linkedinConnected={false}
+                      approval={{
+                        ...approval,
+                        createdAt: approval.createdAt.toISOString(),
+                        conversation: null,
+                        carousel: null,
+                      }}
+                    />
+                  </ErrorBoundary>
+                );
+              }
+              return (
+                <div key={reel.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-4">
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="text-sm font-medium text-[var(--text-primary)]">
+                      {reel.title ?? "Untitled Reel"}
+                    </span>
+                    <span
+                      className="text-xs font-medium"
+                      style={{ color: STATUS_COLOR[reel.status] ?? "var(--text-muted)" }}
+                    >
+                      {STATUS_LABEL[reel.status] ?? reel.status}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    {REEL_MODE_LABELS[reel.mode as ReelMode] ?? reel.mode}
+                  </p>
                 </div>
-                <p className="text-xs text-[var(--text-muted)]">
-                  {REEL_MODE_LABELS[reel.mode as ReelMode] ?? reel.mode}
-                </p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
