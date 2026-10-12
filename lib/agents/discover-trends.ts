@@ -120,7 +120,10 @@ new or interesting, say so plainly rather than forcing results.`;
 
   if (!researchText) {
     // Paused mid-search, refused, or genuinely found nothing — not an error,
-    // just nothing to add this cycle.
+    // just nothing to add this cycle. Logged (not just silently returned)
+    // so a "0 new trends" run can actually be diagnosed from Vercel's
+    // Runtime Logs instead of being a dead end.
+    console.log(`[discover-trends] account ${accountId}: researchWithWebSearch returned no text.`);
     return { ok: true, created: 0 };
   }
 
@@ -186,6 +189,17 @@ ${researchText}
         const isDuplicate = err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
         if (!isDuplicate) throw err;
       }
+    }
+    // Same reasoning as the no-text branch above — when nothing got
+    // created, log what the research/extraction steps actually produced so
+    // a "0 new trends" run is diagnosable (genuinely nothing found vs. the
+    // extraction step being overly conservative) instead of a dead end.
+    if (created === 0) {
+      console.log(
+        `[discover-trends] account ${accountId}: research found nothing worth extracting.\n` +
+          `Research text:\n${researchText}\n\n` +
+          `Extraction result: ${JSON.stringify({ trend1: extracted.trend1, trend2: extracted.trend2, trend3: extracted.trend3 })}`,
+      );
     }
     return { ok: true, created };
   } catch (err) {
