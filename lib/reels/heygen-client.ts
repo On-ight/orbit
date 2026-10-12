@@ -1,6 +1,24 @@
 const HEYGEN_VIDEOS_URL = "https://api.heygen.com/v3/videos";
 const HEYGEN_LOOKS_URL = "https://api.heygen.com/v3/avatars/looks?avatar_type=digital_twin&ownership=private";
 
+// HeyGen's error body isn't consistently shaped — sometimes a flat string
+// under .message/.error, sometimes .error is itself a nested object (e.g.
+// { error: { message, code } }). Interpolating that object directly into a
+// template string silently produces the literal text "[object Object]" via
+// its default toString, discarding the real detail — seen in practice in a
+// real failure. This always surfaces something readable instead.
+function heygenErrorDetail(body: unknown): string {
+  const record = body as Record<string, unknown> | null;
+  const candidate = record?.message ?? record?.error;
+  if (typeof candidate === "string") return candidate;
+  if (candidate && typeof candidate === "object") {
+    const nested = candidate as Record<string, unknown>;
+    if (typeof nested.message === "string") return nested.message;
+    return JSON.stringify(candidate);
+  }
+  return "unknown error";
+}
+
 export interface HeygenAvatar {
   id: string;
   name: string;
@@ -24,8 +42,7 @@ export async function listHeygenAvatars(): Promise<HeygenAvatar[]> {
   const res = await fetch(HEYGEN_LOOKS_URL, { headers: { "x-api-key": apiKey } });
   const body = await res.json().catch(() => null);
   if (!res.ok) {
-    const detail = body?.message ?? body?.error ?? `HTTP ${res.status}`;
-    throw new Error(`HeyGen API error: ${detail}`);
+    throw new Error(`HeyGen API error (HTTP ${res.status}): ${heygenErrorDetail(body)}`);
   }
 
   const data = Array.isArray(body?.data) ? body.data : [];
@@ -79,8 +96,7 @@ export async function submitHeygenVideo(args: {
 
   const body = await res.json().catch(() => null);
   if (!res.ok) {
-    const detail = body?.message ?? body?.error ?? `HTTP ${res.status}`;
-    throw new Error(`HeyGen API error: ${detail}`);
+    throw new Error(`HeyGen API error (HTTP ${res.status}): ${heygenErrorDetail(body)}`);
   }
 
   const videoId = body?.data?.video_id;
