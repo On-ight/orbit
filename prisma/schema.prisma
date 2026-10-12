@@ -61,9 +61,15 @@ model Account {
   // Set right before each Trend Discovery attempt (lib/agents/discover-trends.ts)
   // regardless of outcome — Groq's browser_search tool has no caller-side cap
   // on how many pages it reads per call, so a single call's token cost is
-  // unbounded. This is the actual lever available: at most one attempt per
-  // account per calendar day, no matter how many times a cycle is triggered.
+  // unbounded. Together with trendDiscoveryAttemptsToday below, this caps
+  // attempts per account per calendar day, no matter how many times a cycle
+  // is triggered.
   lastTrendDiscoveryAt DateTime?
+  // Attempts made on the calendar day lastTrendDiscoveryAt falls on — reset
+  // to 0 (then incremented to 1) the first time a new day is detected, not
+  // decremented/reset by anything else. Capped at MAX_TREND_DISCOVERY_ATTEMPTS_PER_DAY
+  // in discover-trends.ts.
+  trendDiscoveryAttemptsToday Int @default(0)
 
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt

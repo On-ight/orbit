@@ -9,6 +9,11 @@ import { callStructuredCompletion, researchWithWebSearch } from "@/lib/agents/ll
 // extractionSchema below — changing the count means adding/removing slots too.
 const MAX_NEW_TRENDS_PER_CYCLE = 3;
 
+// See the comment at this constant's use below — the real lever against
+// Groq's uncapped browser_search token cost is attempt frequency, not a
+// per-call limit (there isn't one). Raised from 1 to 3 per account per day.
+const MAX_TREND_DISCOVERY_ATTEMPTS_PER_DAY = 3;
+
 function slugify(topic: string): string {
   return topic
     .toLowerCase()
@@ -70,14 +75,20 @@ export async function discoverTrends(
   // reads per call — verified against both Groq's docs and the groq-sdk's own
   // types, which accept nothing beyond { type: "browser_search" } — so a
   // single call's token cost is unbounded and can be large. The only lever
-  // available is frequency: at most one attempt per account per calendar
-  // day, no matter how many times a cycle is triggered (including manually).
+  // available is frequency: at most MAX_TREND_DISCOVERY_ATTEMPTS_PER_DAY
+  // attempts per account per calendar day, no matter how many times a cycle
+  // is triggered (including manually).
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
-  if (account.lastTrendDiscoveryAt && account.lastTrendDiscoveryAt >= startOfToday) {
+  const isNewDay = !account.lastTrendDiscoveryAt || account.lastTrendDiscoveryAt < startOfToday;
+  const attemptsSoFarToday = isNewDay ? 0 : account.trendDiscoveryAttemptsToday;
+  if (attemptsSoFarToday >= MAX_TREND_DISCOVERY_ATTEMPTS_PER_DAY) {
     return { ok: true, created: 0, skipped: true };
   }
-  await prisma.account.update({ where: { id: accountId }, data: { lastTrendDiscoveryAt: new Date() } });
+  await prisma.account.update({
+    where: { id: accountId },
+    data: { lastTrendDiscoveryAt: new Date(), trendDiscoveryAttemptsToday: attemptsSoFarToday + 1 },
+  });
 
   // No code path in this app ever writes key: "CONTENT_PILLARS" or
   // "SAFETY_RULES" (those were meant as standard slots, never wired up) — a
