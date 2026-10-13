@@ -9,9 +9,6 @@ import { callStructuredCompletion, researchWithWebSearch } from "@/lib/agents/ll
 // extractionSchema below — changing the count means adding/removing slots too.
 const MAX_NEW_TRENDS_PER_CYCLE = 3;
 
-// Temporarily unused — see the TEMPORARILY DISABLED comment at this
-// constant's use below.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const MAX_TREND_DISCOVERY_ATTEMPTS_PER_DAY = 3;
 
 function slugify(topic: string): string {
@@ -74,19 +71,20 @@ export async function discoverTrends(
   // Groq's browser_search tool has no caller-side cap on how many pages it
   // reads per call — verified against both Groq's docs and the groq-sdk's own
   // types, which accept nothing beyond { type: "browser_search" } — so a
-  // single call's token cost is unbounded and can be large. The per-day
-  // attempt cap that used to gate this (MAX_TREND_DISCOVERY_ATTEMPTS_PER_DAY)
-  // is TEMPORARILY DISABLED per explicit request while debugging the Groq
-  // 429s directly — attemptsSoFarToday is still tracked below (harmless) so
-  // the cap can be reinstated by uncommenting the check, without losing the
-  // counter's state.
+  // single call's token cost is unbounded and can be large. The only lever
+  // available is frequency: at most MAX_TREND_DISCOVERY_ATTEMPTS_PER_DAY
+  // attempts per account per calendar day, no matter how many times a cycle
+  // is triggered (including manually). Re-enabled after a real
+  // FUNCTION_INVOCATION_TIMEOUT incident traced partly to this running
+  // unbounded — on Vercel's Hobby plan (60s hard cap, can't be raised),
+  // keeping this call rare matters more than ever.
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
   const isNewDay = !account.lastTrendDiscoveryAt || account.lastTrendDiscoveryAt < startOfToday;
   const attemptsSoFarToday = isNewDay ? 0 : account.trendDiscoveryAttemptsToday;
-  // if (attemptsSoFarToday >= MAX_TREND_DISCOVERY_ATTEMPTS_PER_DAY) {
-  //   return { ok: true, created: 0, skipped: true };
-  // }
+  if (attemptsSoFarToday >= MAX_TREND_DISCOVERY_ATTEMPTS_PER_DAY) {
+    return { ok: true, created: 0, skipped: true };
+  }
   await prisma.account.update({
     where: { id: accountId },
     data: { lastTrendDiscoveryAt: new Date(), trendDiscoveryAttemptsToday: attemptsSoFarToday + 1 },
