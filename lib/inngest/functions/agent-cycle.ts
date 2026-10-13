@@ -28,6 +28,33 @@ export const agentCycleFn = inngest.createFunction(
     concurrency: { limit: 5 },
     retries: 2,
     triggers: [{ event: AGENT_CYCLE_REQUESTED }],
+    // Catches what the per-stage try/catches below cannot: the whole
+    // function getting killed outright (e.g. a Vercel FUNCTION_INVOCATION_
+    // TIMEOUT) after exhausting all retries, rather than a normal JS
+    // exception thrown from inside the function body. Without this, the
+    // AgentRun row created at the very start of the function stays
+    // "RUNNING" forever in Settings' Recent runs — Inngest's own dashboard
+    // shows the real "Failed" status, but nothing ever reaches back into
+    // our own update call, since the function never got to its finalize
+    // step. Matches on accountId + still-RUNNING rather than a specific
+    // run id (not available here — this handler never sees the function's
+    // own step outputs), which assumes at most one run in flight per
+    // account at a time; true for how this is triggered today (one cron
+    // slot or manual click at a time), but would mislabel a genuinely
+    // still-running second run for the same account if that ever changed.
+    onFailure: async ({ event, error }) => {
+      const accountId = (event.data.event.data as AgentCycleRequestedData | undefined)?.accountId;
+      if (!accountId) return;
+      await prisma.agentRun.updateMany({
+        where: { accountId, status: "RUNNING" },
+        data: {
+          status: "FAILED",
+          summary: `Run failed unexpectedly: ${error.message}`,
+          error: error.message,
+          completedAt: new Date(),
+        },
+      });
+    },
   },
   async ({ event, step }) => {
     const { accountId, triggeredBy } = event.data as AgentCycleRequestedData;
