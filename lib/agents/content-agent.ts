@@ -212,10 +212,16 @@ export async function runContentAgentOnTrend(accountId: string, trendId: string)
     }
 
     if (results.length === 0) {
+      // Logged (not just returned) — agent-cycle.ts's run summary only ever
+      // aggregates these into a bare failure count, so without this a
+      // "Content Agent: N processed, M failed" line is a dead end for
+      // diagnosing why.
+      console.error(`Content Agent: trend ${trend.id} produced zero valid drafts:`, errors);
       return { trendId, ok: false, error: errors.join("; ") };
     }
     return { trendId, ok: true, error: errors.length > 0 ? errors.join("; ") : undefined };
   } catch (err) {
+    console.error(`Content Agent: drafting failed for trend ${trend.id}:`, err);
     return { trendId, ok: false, error: String(err) };
   }
 }
