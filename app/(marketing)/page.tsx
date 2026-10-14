@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ApprovalQueueDemo } from "@/components/marketing/ApprovalQueueDemo";
+import { DashboardPreview } from "@/components/marketing/DashboardPreview";
 
 const SEGMENTS = [
   {
@@ -123,6 +124,13 @@ export default function LandingPage() {
           </div>
 
           <ApprovalQueueDemo />
+        </div>
+
+        <div className="mt-20">
+          <p className="mb-6 text-center text-sm font-medium uppercase tracking-widest text-neutral-500">
+            The actual dashboard
+          </p>
+          <DashboardPreview />
         </div>
       </section>
 
