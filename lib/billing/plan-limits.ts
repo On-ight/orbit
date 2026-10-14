@@ -1,4 +1,5 @@
 import { PLAN_TIERS, type PlanTier } from "./pricing";
+import type { Platform } from "@/lib/types";
 
 // Deliberately limited to what's actually real and enforceable today — no
 // "workspaces" or "team members" here, since the product has no
@@ -16,6 +17,12 @@ export interface PlanLimits {
   // Reels), so this cap only bounds LLM-call volume — meaningfully more
   // generous than reelsPerMonth at every tier.
   carouselsPerMonth: number;
+  // Which of X/Threads/LinkedIn Content Agent will actually draft for, even
+  // if more than these are connected — checked in
+  // lib/agents/content-agent.ts's runContentAgentOnTrend. Instagram (Reels/
+  // Carousels) isn't part of this list; that's gated by reelsPerMonth/
+  // carouselsPerMonth instead, since it's a different Platform union entirely.
+  textPlatforms: Platform[];
 }
 
 export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
@@ -26,10 +33,38 @@ export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
   // which already bounds exposure the same way aiGenerationsPerMonth does.
   // Without this, Free's Reel/Carousel opportunity feed can never populate
   // during the trial, since nothing else creates TrendInput rows.
-  FREE: { aiGenerationsPerMonth: 10, trendResearch: true, replyDrafting: false, reelsPerMonth: 0, carouselsPerMonth: 3 },
-  BUILDER: { aiGenerationsPerMonth: 100, trendResearch: true, replyDrafting: true, reelsPerMonth: 5, carouselsPerMonth: 15 },
-  GROWTH: { aiGenerationsPerMonth: null, trendResearch: true, replyDrafting: true, reelsPerMonth: 20, carouselsPerMonth: 50 },
-  AGENCY: { aiGenerationsPerMonth: null, trendResearch: true, replyDrafting: true, reelsPerMonth: 100, carouselsPerMonth: 200 },
+  FREE: {
+    aiGenerationsPerMonth: 10,
+    trendResearch: true,
+    replyDrafting: false,
+    reelsPerMonth: 0,
+    carouselsPerMonth: 3,
+    textPlatforms: ["THREADS"],
+  },
+  BUILDER: {
+    aiGenerationsPerMonth: 100,
+    trendResearch: true,
+    replyDrafting: true,
+    reelsPerMonth: 5,
+    carouselsPerMonth: 15,
+    textPlatforms: ["X", "THREADS", "LINKEDIN"],
+  },
+  GROWTH: {
+    aiGenerationsPerMonth: null,
+    trendResearch: true,
+    replyDrafting: true,
+    reelsPerMonth: 20,
+    carouselsPerMonth: 50,
+    textPlatforms: ["X", "THREADS", "LINKEDIN"],
+  },
+  AGENCY: {
+    aiGenerationsPerMonth: null,
+    trendResearch: true,
+    replyDrafting: true,
+    reelsPerMonth: 100,
+    carouselsPerMonth: 200,
+    textPlatforms: ["X", "THREADS", "LINKEDIN"],
+  },
 };
 
 export function limitsForTier(tier: string | null): PlanLimits {

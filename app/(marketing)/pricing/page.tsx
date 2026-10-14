@@ -36,7 +36,7 @@ const TIERS: { tier: PlanTier; name: string; audience: string; features: string[
     audience: "4-day free trial",
     features: [
       "Full access for 4 days, then choose a paid plan to continue",
-      "1 X account connected",
+      "Threads posts + Instagram Carousels — upgrade for X and LinkedIn",
       generationsLine("FREE"),
       "Full approval queue — Auto / Approval / Never",
       "Manual publishing — you approve and publish every post",

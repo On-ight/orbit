@@ -6,7 +6,7 @@ import { isXConnected } from "@/lib/publishing/x-client";
 import { isThreadsConnected } from "@/lib/publishing/threads-client";
 import { isLinkedInConnected } from "@/lib/publishing/linkedin-client";
 import { PLATFORM_CHAR_LIMITS as PLATFORM_LIMITS, type Platform } from "@/lib/types";
-import { limitsForTier } from "@/lib/billing/plan-limits";
+import { limitsForTier, type PlanLimits } from "@/lib/billing/plan-limits";
 import { countAiGenerationsThisMonth } from "@/lib/billing/usage";
 
 // Bounds concurrent LLM calls against the single shared Groq key per account
@@ -145,11 +145,16 @@ platform's draft gets rejected outright and doesn't get published at all.`,
  * row) — Post.sourceTrendId is already one-to-many and platform already
  * exists on both models, so this needed no relation changes. Drafts one
  * variant for each of X/Threads/LinkedIn that this account has actually
- * connected directly (see lib/publishing/{x,threads,linkedin}-client.ts) —
- * none of the three go through Buffer anymore. If none are connected yet,
- * this is a no-op.
+ * connected directly (see lib/publishing/{x,threads,linkedin}-client.ts) AND
+ * that the account's plan tier allows (limits.textPlatforms — e.g. Free only
+ * allows Threads) — none of the three go through Buffer anymore. If nothing
+ * is both connected and allowed, this is a no-op.
  */
-export async function runContentAgentOnTrend(accountId: string, trendId: string): Promise<ContentAgentItemResult> {
+export async function runContentAgentOnTrend(
+  accountId: string,
+  trendId: string,
+  limits: PlanLimits,
+): Promise<ContentAgentItemResult> {
   const trend = await prisma.trendInput.findUnique({
     where: { id: trendId },
     include: { posts: { select: { platform: true } } },
@@ -175,7 +180,9 @@ export async function runContentAgentOnTrend(accountId: string, trendId: string)
     ...(threadsConnected ? (["THREADS"] as const) : []),
     ...(linkedinConnected ? (["LINKEDIN"] as const) : []),
   ];
-  const targetPlatforms = connectedPlatforms.filter((p) => !existingPlatforms.has(p));
+  const targetPlatforms = connectedPlatforms.filter(
+    (p) => !existingPlatforms.has(p) && limits.textPlatforms.includes(p),
+  );
 
   if (targetPlatforms.length === 0) return { trendId, ok: true };
 
@@ -240,5 +247,5 @@ export async function runContentAgent(accountId: string): Promise<ContentAgentIt
     select: { id: true },
   });
 
-  return Promise.all(readyTrends.map((trend) => limit(() => runContentAgentOnTrend(accountId, trend.id))));
+  return Promise.all(readyTrends.map((trend) => limit(() => runContentAgentOnTrend(accountId, trend.id, limits))));
 }
