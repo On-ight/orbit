@@ -69,21 +69,34 @@ const TIER_BADGE: Record<DemoItem["tier"], string> = {
 
 type ItemState = "pending" | "editing" | "approved" | "rejected";
 
-export function ApprovalQueueDemo() {
+export function ApprovalQueueDemo({
+  variant = "tilted",
+}: {
+  // "tilted" is the floating hero-card look (homepage hero). "flat" drops
+  // the 3D tilt/shadow and outer label — used when embedding this inside
+  // another frame (DashboardPreview's Approvals tab) that already
+  // provides its own chrome.
+  variant?: "tilted" | "flat";
+}) {
   const [states, setStates] = useState<Record<string, ItemState>>({});
   // Committed text per item, separate from the in-progress textarea value so
   // Cancel can discard an edit without touching what's actually "saved".
   const [texts, setTexts] = useState<Record<string, string>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
 
-  return (
-    <div className="[perspective:1600px]">
-      <div
-        className="space-y-3 rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-4 shadow-[0_30px_70px_-20px_rgba(142,66,252,0.35),0_12px_28px_-8px_rgba(0,0,0,0.18)] transition-transform duration-300 ease-out [transform:rotateY(-8deg)_rotateX(3deg)] hover:[transform:rotateY(-3deg)_rotateX(1deg)]"
-      >
-        <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
-          Orbit&apos;s approval queue — try it
-        </p>
+  const list = (
+    <div
+      className={
+        variant === "tilted"
+          ? "space-y-3 rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-4 shadow-[0_30px_70px_-20px_rgba(142,66,252,0.35),0_12px_28px_-8px_rgba(0,0,0,0.18)] transition-transform duration-300 ease-out [transform:rotateY(-8deg)_rotateX(3deg)] hover:[transform:rotateY(-3deg)_rotateX(1deg)]"
+          : "space-y-3"
+      }
+    >
+        {variant === "tilted" && (
+          <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
+            Orbit&apos;s approval queue — try it
+          </p>
+        )}
 
         {ITEMS.map((item) => {
           const state = states[item.id] ?? "pending";
@@ -195,7 +208,8 @@ export function ApprovalQueueDemo() {
             </div>
           );
         })}
-      </div>
     </div>
   );
+
+  return variant === "tilted" ? <div className="[perspective:1600px]">{list}</div> : list;
 }
