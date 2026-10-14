@@ -101,11 +101,12 @@ export default function LandingPage() {
           <div>
             <p className="text-sm font-medium uppercase tracking-widest text-neutral-500">AI marketing agent</p>
             <h1 className="mt-4 text-4xl font-semibold leading-tight tracking-tight md:text-5xl">
-              Your marketing team, without the extra hire.
+              We don&apos;t ship features. We ship consistency.
             </h1>
             <p className="mt-5 max-w-md text-lg text-neutral-600">
-              Orbit watches what&apos;s happening in your industry, turns your product updates into content,
-              and publishes across X, Threads &amp; LinkedIn — with you in control.
+              Most marketing tools chase more dashboards, more analytics, more features. Orbit just
+              keeps showing up — drafting and publishing across X, Threads, LinkedIn &amp; Instagram
+              every day, getting sharper as your content and product evolve.
             </p>
             <div className="mt-8 flex items-center gap-4">
               <Link
