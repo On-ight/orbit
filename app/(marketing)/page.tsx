@@ -57,6 +57,10 @@ const EXAMPLE_DRAFTS = [
     platform: "LinkedIn",
     text: "We redesigned our onboarding flow this quarter. The old version asked new users to configure five things before they saw any value — the new one shows a working result first, and lets them customize after. Time-to-first-value dropped from ~15 minutes to under 2.",
   },
+  {
+    platform: "Instagram",
+    text: "Carousel: “5 reasons onboarding flows lose users” — slide 1 opens with the old 15-minute setup, slide 5 closes with the new under-2-minute one. AI-avatar Reels get the same treatment.",
+  },
 ];
 
 const PLATFORMS = [
@@ -158,12 +162,12 @@ export default function LandingPage() {
       {/* One idea, three platforms */}
       <section className="border-t border-neutral-200 bg-neutral-50">
         <div className="mx-auto max-w-6xl px-6 py-20">
-          <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">One idea. Three platforms.</h2>
+          <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">One idea. Four platforms.</h2>
           <p className="mt-3 max-w-2xl text-neutral-600">
-            The same update, adapted to how each platform actually gets read — not one post pasted three
+            The same update, adapted to how each platform actually gets read — not one post pasted four
             times. Illustrative example below.
           </p>
-          <div className="mt-10 grid gap-4 md:grid-cols-3">
+          <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {EXAMPLE_DRAFTS.map((draft) => (
               <div key={draft.platform} className="rounded-xl border border-neutral-200 bg-white p-5">
                 <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{draft.platform}</p>
