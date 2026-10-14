@@ -3,6 +3,7 @@ import { requireCurrentUser } from "@/lib/auth/current-user";
 import { ReelOpportunityCard } from "@/components/reels/ReelOpportunityCard";
 import { ApprovalCard } from "@/components/approvals/ApprovalCard";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { EmptyState } from "@/components/EmptyState";
 import { limitsForTier } from "@/lib/billing/plan-limits";
 import { countReelsThisMonth } from "@/lib/billing/usage";
 import { isInstagramConnected } from "@/lib/publishing/instagram-client";
@@ -100,9 +101,7 @@ export default async function ReelsPage() {
       <section className="mt-8">
         <h2 className="mb-3 text-sm font-semibold text-[var(--text-primary)]">Your Reels</h2>
         {reels.length === 0 ? (
-          <p className="rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-6 text-sm text-[var(--text-muted)]">
-            No Reels yet.
-          </p>
+          <EmptyState mascot="wave" title="No Reels yet" description="Generate one from an opportunity above to get started." />
         ) : (
           <div className="space-y-3">
             {reels.map((reel) => {

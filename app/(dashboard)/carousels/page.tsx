@@ -3,6 +3,7 @@ import { requireCurrentUser } from "@/lib/auth/current-user";
 import { CarouselOpportunityCard } from "@/components/carousels/CarouselOpportunityCard";
 import { ApprovalCard } from "@/components/approvals/ApprovalCard";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { EmptyState } from "@/components/EmptyState";
 import { limitsForTier } from "@/lib/billing/plan-limits";
 import { countCarouselsThisMonth } from "@/lib/billing/usage";
 import { isInstagramConnected } from "@/lib/publishing/instagram-client";
@@ -97,9 +98,7 @@ export default async function CarouselsPage() {
       <section className="mt-8">
         <h2 className="mb-3 text-sm font-semibold text-[var(--text-primary)]">Your Carousels</h2>
         {carousels.length === 0 ? (
-          <p className="rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-6 text-sm text-[var(--text-muted)]">
-            No Carousels yet.
-          </p>
+          <EmptyState mascot="wave" title="No Carousels yet" description="Generate one from an opportunity above to get started." />
         ) : (
           <div className="space-y-3">
             {carousels.map((carousel) => {

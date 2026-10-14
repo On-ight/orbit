@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db/prisma";
 import { ApprovalCard } from "@/components/approvals/ApprovalCard";
+import { EmptyState } from "@/components/EmptyState";
 import { activeBufferPlatforms } from "@/lib/publishing/buffer-client";
 import { isInstagramConnected } from "@/lib/publishing/instagram-client";
 import { isThreadsConnected } from "@/lib/publishing/threads-client";
@@ -93,10 +94,11 @@ export default async function ApprovalsPage({
 
       <div className="mt-6 space-y-4">
         {approvals.length === 0 && (
-          <p className="rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-6 text-sm text-[var(--text-muted)]">
-            Nothing pending{activeTab ? ` for ${TAB_LABELS[activeTab]}` : ""}. Run an agent cycle
-            from Settings to generate new drafts.
-          </p>
+          <EmptyState
+            mascot="wave"
+            title={`Nothing pending${activeTab ? ` for ${TAB_LABELS[activeTab]}` : ""}`}
+            description="Run an agent cycle from Settings to generate new drafts."
+          />
         )}
         {approvals.map((approval) => (
           <ApprovalCard
