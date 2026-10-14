@@ -5,6 +5,7 @@ import { attachSessionCookie } from "@/lib/auth/issue-session";
 import { withIpRateLimit } from "@/lib/auth/with-auth";
 import { authSessionLimiter } from "@/lib/redis/rate-limit";
 import { ACCOUNT_TYPES } from "@/lib/types";
+import { sendNewSignupEmail } from "@/lib/notifications/email";
 
 // Firebase Auth (client SDK) does the actual credential check — login/signup
 // pages sign in/up directly against Firebase, then hand the resulting ID
@@ -53,6 +54,14 @@ export const POST = withIpRateLimit(authSessionLimiter, async (request: NextRequ
         },
       },
     });
+
+    // Best-effort — a notification failing must never break someone's
+    // actual signup. Silently a no-op unless ADMIN_NOTIFICATION_EMAIL is set.
+    try {
+      await sendNewSignupEmail({ email: user.email, accountName, accountType });
+    } catch (err) {
+      console.error("Failed to send new-signup notification email:", err);
+    }
   }
 
   const response = NextResponse.json({ ok: true });

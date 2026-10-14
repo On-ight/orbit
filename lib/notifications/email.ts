@@ -46,3 +46,30 @@ export async function sendRunCompletedEmail(args: RunCompletedEmailArgs): Promis
     text: args.summary,
   });
 }
+
+interface NewSignupEmailArgs {
+  email: string;
+  accountName: string;
+  accountType: string;
+}
+
+/**
+ * Notifies you (the app owner), not the new user — ADMIN_NOTIFICATION_EMAIL
+ * is a separate address from anything tied to an Account/User row. Silently
+ * a no-op if either RESEND_API_KEY or ADMIN_NOTIFICATION_EMAIL is unset, same
+ * pattern as sendRunCompletedEmail. Best-effort — callers (app/api/auth/
+ * session/route.ts) must swallow whatever this throws rather than let a
+ * failed notification break someone's actual signup.
+ */
+export async function sendNewSignupEmail(args: NewSignupEmailArgs): Promise<void> {
+  const resend = getClient();
+  const to = process.env.ADMIN_NOTIFICATION_EMAIL;
+  if (!resend || !to) return;
+
+  await resend.emails.send({
+    from: process.env.RESEND_FROM_EMAIL || DEFAULT_FROM,
+    to,
+    subject: "New Orbit signup",
+    text: `${args.email} just signed up — account "${args.accountName}" (${args.accountType}).`,
+  });
+}
