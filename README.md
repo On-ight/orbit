@@ -131,6 +131,20 @@ show, now also shown for Instagram items once connected. Under the hood
 this is a durable `step.sleepUntil` inside the Inngest function, not a
 separate cron — it costs nothing while waiting, even for a schedule days out.
 
+Every agent cycle also pulls **per-post Instagram insights** (likes,
+comments, reach, saves) for Reels/Carousels published in the last 30 days,
+via `lib/agents/instagram-insights-agent.ts`. This needs the
+`instagram_business_manage_insights` scope, which is now part of the
+connect flow's `SCOPE` string — **if you connected Instagram before this
+scope was added, click Reconnect in Settings once**, since OAuth only
+grants what was asked for at consent time, not retroactively. Once at least
+3 posts have measured engagement, a short auto-generated performance
+summary gets written into the account's knowledge base (so future Reel/
+Carousel drafts actually lean into what's performed well — no separate
+mechanism, it rides the same `buildSystemPrompt()` every agent already
+uses) and surfaced on the new **Marketing tips** page alongside general,
+always-shown best-practice advice.
+
 ## Connecting Threads directly (not Buffer)
 
 Same deal as Instagram — Threads posts (`POST` approvals for the Threads

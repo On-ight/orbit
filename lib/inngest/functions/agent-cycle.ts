@@ -4,6 +4,7 @@ import { discoverMentions } from "@/lib/agents/discover-mentions";
 import { runTrendAgent } from "@/lib/agents/trend-agent";
 import { runContentAgent } from "@/lib/agents/content-agent";
 import { runCommunityAgent } from "@/lib/agents/community-agent";
+import { fetchInstagramInsights } from "@/lib/agents/instagram-insights-agent";
 import { inngest, AGENT_CYCLE_REQUESTED, type AgentCycleRequestedData } from "@/lib/inngest/client";
 import { limitsForTier } from "@/lib/billing/plan-limits";
 import { isTrialExpired, expireTrialForAccount } from "@/lib/billing/trial";
@@ -149,6 +150,19 @@ export const agentCycleFn = inngest.createFunction(
     } catch (err) {
       hadError = true;
       parts.push(`Content Agent crashed: ${String(err)}`);
+    }
+
+    // Not gated by limits.* — a handful of free, read-only Meta API calls,
+    // not per-unit vendor spend like Reels, so there's nothing here worth
+    // restricting by plan tier (see lib/billing/plan-limits.ts's own
+    // comment on what actually gets gated and why). No-ops cleanly if
+    // Instagram isn't connected.
+    try {
+      const insightsResult = await step.run("fetch-instagram-insights", () => fetchInstagramInsights(accountId));
+      parts.push(`Instagram Insights: ${insightsResult.fetched} fetched, ${insightsResult.failed} failed`);
+    } catch (err) {
+      hadError = true;
+      parts.push(`Instagram Insights crashed: ${String(err)}`);
     }
 
     if (limits.replyDrafting) {

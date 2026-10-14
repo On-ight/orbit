@@ -69,6 +69,20 @@ function CarouselsIcon() {
   );
 }
 
+function MarketingTipsIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path
+        d="M8 1.5l1.5 3.2 3.5.5-2.5 2.5.6 3.5L8 9.5l-3.1 1.7.6-3.5-2.5-2.5 3.5-.5L8 1.5Z"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinejoin="round"
+      />
+      <path d="M4 14h8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function SettingsIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -90,6 +104,7 @@ const NAV_ITEMS = [
   { href: "/content", label: "Content", icon: ContentIcon },
   { href: "/reels", label: "Reels", icon: ReelsIcon },
   { href: "/carousels", label: "Carousels", icon: CarouselsIcon },
+  { href: "/marketing-tips", label: "Marketing tips", icon: MarketingTipsIcon },
   { href: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 

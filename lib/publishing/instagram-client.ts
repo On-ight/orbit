@@ -180,3 +180,49 @@ export async function getMediaPermalink(auth: InstagramAuth, mediaId: string): P
     return null;
   }
 }
+
+export interface InstagramMediaInsights {
+  likes: number | null;
+  comments: number | null;
+  reach: number | null;
+  saved: number | null;
+  shares: number | null;
+  totalInteractions: number | null;
+}
+
+const INSIGHT_METRICS = "reach,saved,likes,comments,shares,total_interactions";
+
+/**
+ * Requires the instagram_business_manage_insights scope (see app/api/
+ * connections/instagram/start/route.ts) — accounts connected before that
+ * scope was added need to reconnect before this will return anything.
+ * A metric Instagram doesn't support for a given media type (e.g. carousel
+ * albums don't expose per-slide data) comes back ABSENT from `data`, not
+ * zero — left `null` here rather than guessed at, so callers can't
+ * mistake "not supported" for "zero engagement."
+ */
+export async function getMediaInsights(auth: InstagramAuth, mediaId: string): Promise<InstagramMediaInsights> {
+  const url = new URL(`${GRAPH_BASE}/${mediaId}/insights`);
+  url.searchParams.set("metric", INSIGHT_METRICS);
+  url.searchParams.set("access_token", auth.accessToken);
+  const res = await fetch(url.toString());
+  const body = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(`Instagram insights error: ${JSON.stringify(body)}`);
+
+  const byName = new Map<string, number>();
+  for (const entry of Array.isArray(body?.data) ? body.data : []) {
+    const value = entry?.values?.[0]?.value;
+    if (typeof entry?.name === "string" && typeof value === "number") {
+      byName.set(entry.name, value);
+    }
+  }
+
+  return {
+    likes: byName.get("likes") ?? null,
+    comments: byName.get("comments") ?? null,
+    reach: byName.get("reach") ?? null,
+    saved: byName.get("saved") ?? null,
+    shares: byName.get("shares") ?? null,
+    totalInteractions: byName.get("total_interactions") ?? null,
+  };
+}

@@ -87,6 +87,7 @@ model Account {
   knowledgeBaseEntries KnowledgeBaseEntry[]
   reels                Reel[]
   carousels            Carousel[]
+  instagramInsights    InstagramInsight[]
 }
 
 model User {
@@ -276,7 +277,35 @@ model Approval {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
+  insight        InstagramInsight?
+
   @@index([accountId, status])
+}
+
+// Per-Instagram-post performance data (lib/publishing/instagram-client.ts's
+// getMediaInsights), refreshed on a rolling window by
+// lib/agents/instagram-insights-agent.ts — kept separate from Approval
+// (rather than new columns there) because these numbers get refetched and
+// updated as engagement accrues, unlike Approval's one-shot publish fields.
+model InstagramInsight {
+  id                String   @id @default(cuid())
+  accountId         String
+  account           Account  @relation(fields: [accountId], references: [id])
+  approvalId        String   @unique
+  approval          Approval @relation(fields: [approvalId], references: [id])
+
+  mediaType         String   // REELS | CAROUSEL_ALBUM | IMAGE
+  likes             Int?
+  comments          Int?
+  reach             Int?
+  saved             Int?
+  shares            Int?
+  totalInteractions Int?
+
+  fetchedAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([accountId])
 }
 
 model AgentRun {

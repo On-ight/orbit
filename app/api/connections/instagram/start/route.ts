@@ -7,7 +7,13 @@ import { SITE_URL } from "@/lib/site-url";
 const PENDING_COOKIE = "instagram_oauth_pending";
 // instagram_business_basic: read the connected profile (id/username).
 // instagram_business_content_publish: the actual publish permission.
-const SCOPE = "instagram_business_basic,instagram_business_content_publish";
+// instagram_business_manage_insights: per-post performance data (likes,
+// comments, reach, saves) — powers lib/agents/instagram-insights-agent.ts.
+// Added after the other two were already in use — anyone who connected
+// before this line shipped needs to reconnect to actually get this scope,
+// since OAuth consent only grants what was asked for at that moment.
+const SCOPE =
+  "instagram_business_basic,instagram_business_content_publish,instagram_business_manage_insights";
 
 function base64url(input: Buffer): string {
   return input.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
