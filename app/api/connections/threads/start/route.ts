@@ -3,6 +3,8 @@ import { randomBytes } from "crypto";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { encryptToken } from "@/lib/security/token-crypto";
 import { SITE_URL } from "@/lib/site-url";
+import { limitsForTier } from "@/lib/billing/plan-limits";
+import { canConnectAnotherPlatform } from "@/lib/billing/usage";
 
 const PENDING_COOKIE = "threads_oauth_pending";
 const SCOPE = "threads_basic,threads_content_publish";
@@ -24,6 +26,11 @@ export async function GET(request: NextRequest) {
   const clientSecret = process.env.THREADS_APP_SECRET;
   if (!clientId || !clientSecret) {
     return NextResponse.redirect(new URL("/settings?threads_error=not_configured", request.url));
+  }
+
+  const limits = limitsForTier(currentUser.account.planTier);
+  if (!(await canConnectAnotherPlatform(currentUser.accountId, "THREADS", limits.maxConnectedAccounts))) {
+    return NextResponse.redirect(new URL("/settings?threads_error=connection_limit", request.url));
   }
 
   const callbackUrl = new URL("/api/connections/threads/callback", SITE_URL).toString();

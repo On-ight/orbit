@@ -29,6 +29,18 @@ function carouselsLine(tier: PlanTier): string {
   return `${limit} AI Carousels / month`;
 }
 
+// Numbers sourced from PLAN_LIMITS (the same values start/route.ts and
+// app/api/approvals/[id]/route.ts actually enforce) rather than hardcoded,
+// so this copy can't silently drift out of sync with what's enforced.
+function connectedAccountsLine(tier: PlanTier): string {
+  return `${PLAN_LIMITS[tier].maxConnectedAccounts} connected social accounts`;
+}
+
+function publishedPostsLine(tier: PlanTier): string {
+  const limit = PLAN_LIMITS[tier].publishedPostsPerMonth;
+  return limit === null ? "Unlimited published posts" : `Up to ${limit.toLocaleString()} published posts/month`;
+}
+
 const TIERS: { tier: PlanTier; name: string; audience: string; features: string[]; mostPopular?: boolean }[] = [
   {
     tier: "FREE",
@@ -37,6 +49,8 @@ const TIERS: { tier: PlanTier; name: string; audience: string; features: string[
     features: [
       "Full access for 4 days, then choose a paid plan to continue",
       "Threads posts + Instagram Carousels — upgrade for X and LinkedIn",
+      connectedAccountsLine("FREE"),
+      publishedPostsLine("FREE"),
       generationsLine("FREE"),
       "Full approval queue — Auto / Approval / Never",
       "Manual publishing — you approve and publish every post",
@@ -47,41 +61,62 @@ const TIERS: { tier: PlanTier; name: string; audience: string; features: string[
   },
   {
     tier: "BUILDER",
-    name: "Builder",
-    audience: "For solo founders",
+    name: "Starter",
+    audience: "For founders who want to stay consistent without spending time publishing manually.",
     features: [
-      "Everything in Free",
-      generationsLine("BUILDER"),
-      "Live trend research — real web search, not templates",
-      "Auto-publish for low-risk (Auto-tier) content",
-      "Reply drafting for mentions",
-      reelsLine("BUILDER"),
-      carouselsLine("BUILDER"),
+      connectedAccountsLine("BUILDER"),
+      publishedPostsLine("BUILDER"),
+      "AI text and caption generation",
+      "Content calendar and scheduling",
+      "Basic brand voice settings",
+      "One workspace",
+      "No included HeyGen video generation",
     ],
   },
   {
     tier: "GROWTH",
     name: "Growth",
-    audience: "For growing startups",
+    audience: "For founders who want Orbit to manage their daily publishing workflow.",
     mostPopular: true,
     features: [
-      "Everything in Builder",
-      generationsLine("GROWTH"),
-      reelsLine("GROWTH"),
-      carouselsLine("GROWTH"),
-      "Priority support",
+      connectedAccountsLine("GROWTH"),
+      publishedPostsLine("GROWTH"),
+      "AI content generation and repurposing",
+      "Scheduling and publishing automation",
+      "Brand voice and reusable content formats",
+      "One workspace",
+      "Basic publishing activity and performance tracking",
+      "Video generation available as a paid add-on",
+    ],
+  },
+  {
+    tier: "PRO",
+    name: "Pro",
+    audience: "For founders and small marketing teams managing several brands or higher publishing volumes.",
+    features: [
+      connectedAccountsLine("PRO"),
+      publishedPostsLine("PRO"),
+      "Everything in Growth",
+      "Multiple workspaces or brands",
+      "Team collaboration and approval workflows",
+      "Advanced scheduling controls",
+      "More detailed performance reporting",
+      "Optional video-generation credits",
     ],
   },
   {
     tier: "AGENCY",
     name: "Agency",
-    audience: "For agencies and teams",
+    audience: "For agencies managing content and publishing for multiple clients.",
     features: [
-      "Everything in Growth",
-      generationsLine("AGENCY"),
-      reelsLine("AGENCY"),
-      carouselsLine("AGENCY"),
-      "Dedicated priority support & onboarding help",
+      connectedAccountsLine("AGENCY"),
+      publishedPostsLine("AGENCY"),
+      "Multiple client workspaces",
+      "Team roles and approval workflows",
+      "Client-specific brand voice settings",
+      "Consolidated publishing overview",
+      "Higher usage limits and priority support",
+      "Video credits purchased separately",
     ],
   },
 ];
@@ -111,7 +146,7 @@ export default async function PricingPage() {
 
       <section className="border-t border-neutral-200 bg-neutral-50">
         <div className="mx-auto max-w-6xl px-6 py-16">
-          <div className="grid gap-6 md:grid-cols-4">
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
             {TIERS.map((tier) => (
               <div
                 key={tier.name}

@@ -3,6 +3,8 @@ import { randomBytes } from "crypto";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { encryptToken } from "@/lib/security/token-crypto";
 import { SITE_URL } from "@/lib/site-url";
+import { limitsForTier } from "@/lib/billing/plan-limits";
+import { canConnectAnotherPlatform } from "@/lib/billing/usage";
 
 const PENDING_COOKIE = "linkedin_oauth_pending";
 // openid+profile: identity (Sign In with LinkedIn using OpenID Connect).
@@ -23,6 +25,11 @@ export async function GET(request: NextRequest) {
   const clientSecret = process.env.LINKEDIN_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
     return NextResponse.redirect(new URL("/settings?linkedin_error=not_configured", request.url));
+  }
+
+  const limits = limitsForTier(currentUser.account.planTier);
+  if (!(await canConnectAnotherPlatform(currentUser.accountId, "LINKEDIN", limits.maxConnectedAccounts))) {
+    return NextResponse.redirect(new URL("/settings?linkedin_error=connection_limit", request.url));
   }
 
   const callbackUrl = new URL("/api/connections/linkedin/callback", SITE_URL).toString();

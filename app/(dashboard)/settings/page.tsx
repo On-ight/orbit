@@ -44,10 +44,14 @@ const TIER_GROUPS: { tier: string; label: string; color: string; actions: string
   },
 ];
 
+// BUILDER's display name is "Starter" — the internal/DB identifier stays
+// BUILDER (see the PLAN_TIERS comment in lib/billing/pricing.ts) so existing
+// subscribers' stored Account.planTier value keeps resolving correctly.
 const PLAN_LABEL: Record<string, string> = {
   FREE: "Free",
-  BUILDER: "Builder",
+  BUILDER: "Starter",
   GROWTH: "Growth",
+  PRO: "Pro",
   AGENCY: "Agency",
 };
 
@@ -58,8 +62,17 @@ const SLOT_LABELS: Record<string, string> = {
   "18:00": "6:00 PM IST",
 };
 
+// Shared across all four platforms' error-message functions below — the
+// account has reached its plan's cap on simultaneous platform connections
+// (PlanLimits.maxConnectedAccounts, checked in each start/route.ts before
+// starting OAuth). Reconnecting an already-connected platform never hits
+// this; only adding a new one beyond the cap does.
+const CONNECTION_LIMIT_MESSAGE =
+  "You've reached your plan's limit on connected accounts — disconnect one first, or upgrade for more.";
+
 function xErrorMessage(code: string): string {
   if (code === "not_configured") return "X isn't configured yet — contact support.";
+  if (code === "connection_limit") return CONNECTION_LIMIT_MESSAGE;
   if (code === "missing_params" || code === "expired") return "That connection link expired — try again.";
   if (code === "token_mismatch") return "Something didn't match up — try connecting again.";
   return "Couldn't connect X — try again, or contact support if it keeps happening.";
@@ -67,6 +80,7 @@ function xErrorMessage(code: string): string {
 
 function instagramErrorMessage(code: string): string {
   if (code === "not_configured") return "Instagram isn't configured yet — contact support.";
+  if (code === "connection_limit") return CONNECTION_LIMIT_MESSAGE;
   if (code === "missing_params" || code === "expired") return "That connection link expired — try again.";
   if (code === "token_mismatch") return "Something didn't match up — try connecting again.";
   return "Couldn't connect Instagram — try again, or contact support if it keeps happening.";
@@ -74,6 +88,7 @@ function instagramErrorMessage(code: string): string {
 
 function threadsErrorMessage(code: string): string {
   if (code === "not_configured") return "Threads isn't configured yet — contact support.";
+  if (code === "connection_limit") return CONNECTION_LIMIT_MESSAGE;
   if (code === "missing_params" || code === "expired") return "That connection link expired — try again.";
   if (code === "token_mismatch") return "Something didn't match up — try connecting again.";
   return "Couldn't connect Threads — try again, or contact support if it keeps happening.";
@@ -87,6 +102,7 @@ function isTokenLive(expiresAt: Date | undefined): boolean {
 
 function linkedinErrorMessage(code: string): string {
   if (code === "not_configured") return "LinkedIn isn't configured yet — contact support.";
+  if (code === "connection_limit") return CONNECTION_LIMIT_MESSAGE;
   if (code === "missing_params" || code === "expired") return "That connection link expired — try again.";
   if (code === "token_mismatch") return "Something didn't match up — try connecting again.";
   return "Couldn't connect LinkedIn — try again, or contact support if it keeps happening.";

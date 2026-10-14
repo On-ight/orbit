@@ -3,6 +3,8 @@ import { randomBytes, createHash } from "crypto";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { encryptToken } from "@/lib/security/token-crypto";
 import { SITE_URL } from "@/lib/site-url";
+import { limitsForTier } from "@/lib/billing/plan-limits";
+import { canConnectAnotherPlatform } from "@/lib/billing/usage";
 
 const PENDING_COOKIE = "x_oauth_pending";
 const SCOPE = "tweet.read tweet.write users.read offline.access";
@@ -34,6 +36,11 @@ export async function GET(request: NextRequest) {
   const clientSecret = process.env.X_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
     return NextResponse.redirect(new URL("/settings?x_error=not_configured", request.url));
+  }
+
+  const limits = limitsForTier(currentUser.account.planTier);
+  if (!(await canConnectAnotherPlatform(currentUser.accountId, "X", limits.maxConnectedAccounts))) {
+    return NextResponse.redirect(new URL("/settings?x_error=connection_limit", request.url));
   }
 
   // Fixed to the canonical site origin, not request.url — the visitor may

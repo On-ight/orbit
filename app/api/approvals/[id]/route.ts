@@ -8,6 +8,8 @@ import { isThreadsConnected } from "@/lib/publishing/threads-client";
 import { isXConnected, publishPostToX } from "@/lib/publishing/x-client";
 import { isLinkedInConnected, publishPostToLinkedIn } from "@/lib/publishing/linkedin-client";
 import { inngest, INSTAGRAM_PUBLISH_REQUESTED, THREADS_PUBLISH_REQUESTED } from "@/lib/inngest/client";
+import { limitsForTier } from "@/lib/billing/plan-limits";
+import { countPublishedPostsThisMonth } from "@/lib/billing/usage";
 
 type Action = "approve" | "reject" | "edit";
 
@@ -77,6 +79,23 @@ export const PATCH = withAuth<{ params: Promise<{ id: string }> }>(async (reques
   const finalImageUrl = imageUrlInput ?? approval.imageUrl ?? undefined;
 
   if (action === "approve") {
+    // Scoped to type "POST" only, matching countPublishedPostsThisMonth's own
+    // scope (REPLY/REEL/CAROUSEL have their own separate caps elsewhere —
+    // replyDrafting, reelsPerMonth, carouselsPerMonth). Checked before any
+    // publish attempt so a plan at its limit can't even queue one more.
+    if (approval.type === "POST") {
+      const limits = limitsForTier(currentUser.account.planTier);
+      if (limits.publishedPostsPerMonth !== null) {
+        const used = await countPublishedPostsThisMonth(currentUser.accountId);
+        if (used >= limits.publishedPostsPerMonth) {
+          return NextResponse.json(
+            { error: `You've used all ${limits.publishedPostsPerMonth} published posts included in your plan this month.` },
+            { status: 403 },
+          );
+        }
+      }
+    }
+
     // Publishing goes through Buffer only — every tenant publishes exclusively
     // via their own connected AccountBufferChannel, never a global fallback
     // credential, so one tenant can never accidentally post through another's

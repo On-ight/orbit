@@ -3,6 +3,8 @@ import { randomBytes } from "crypto";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { encryptToken } from "@/lib/security/token-crypto";
 import { SITE_URL } from "@/lib/site-url";
+import { limitsForTier } from "@/lib/billing/plan-limits";
+import { canConnectAnotherPlatform } from "@/lib/billing/usage";
 
 const PENDING_COOKIE = "instagram_oauth_pending";
 // instagram_business_basic: read the connected profile (id/username).
@@ -29,6 +31,11 @@ export async function GET(request: NextRequest) {
   const clientSecret = process.env.INSTAGRAM_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
     return NextResponse.redirect(new URL("/settings?instagram_error=not_configured", request.url));
+  }
+
+  const limits = limitsForTier(currentUser.account.planTier);
+  if (!(await canConnectAnotherPlatform(currentUser.accountId, "INSTAGRAM", limits.maxConnectedAccounts))) {
+    return NextResponse.redirect(new URL("/settings?instagram_error=connection_limit", request.url));
   }
 
   // Fixed to the canonical site origin, not request.url — same reasoning as

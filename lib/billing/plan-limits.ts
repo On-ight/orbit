@@ -23,6 +23,20 @@ export interface PlanLimits {
   // Carousels) isn't part of this list; that's gated by reelsPerMonth/
   // carouselsPerMonth instead, since it's a different Platform union entirely.
   textPlatforms: Platform[];
+  // Cap on distinct platform connections (X/Threads/LinkedIn/Instagram) at
+  // once — checked in each app/api/connections/{platform}/start/route.ts
+  // before starting a NEW connection (reconnecting an already-connected
+  // platform never counts against this). Tiers above 4 are effectively
+  // unlimited today since there are only 4 connectable platforms — kept at
+  // the real configured number anyway rather than clamped, so it stays
+  // correct if more platforms are ever added.
+  maxConnectedAccounts: number;
+  // Cap on type:"POST" approvals actually approved this month (checked at
+  // the approve action in app/api/approvals/[id]/route.ts) — distinct from
+  // aiGenerationsPerMonth, which bounds draft/LLM-call volume. You can
+  // draft more than you publish; this is the number that's actually shown
+  // on the pricing page. null = unlimited.
+  publishedPostsPerMonth: number | null;
 }
 
 export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
@@ -40,30 +54,57 @@ export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
     reelsPerMonth: 0,
     carouselsPerMonth: 3,
     textPlatforms: ["THREADS"],
+    // 2, not 1 — Free's two allowed content types (Threads text, Instagram
+    // Carousels) each need their own platform connection, so capping at 1
+    // would make one of the two advertised Free features unreachable.
+    maxConnectedAccounts: 2,
+    publishedPostsPerMonth: 10,
   },
+  // Displayed as "Starter" — see the PLAN_TIERS comment in pricing.ts on
+  // why the internal/DB identifier stays BUILDER.
   BUILDER: {
-    aiGenerationsPerMonth: 100,
+    aiGenerationsPerMonth: null,
     trendResearch: true,
     replyDrafting: true,
-    reelsPerMonth: 5,
+    // No tier includes Reel/video generation by default anymore — it's a
+    // paid add-on per the current pricing copy. No credit-purchase system
+    // exists yet to actually sell that add-on, so for now this is simply 0
+    // on every paid tier rather than a number nothing can fulfill.
+    reelsPerMonth: 0,
     carouselsPerMonth: 15,
     textPlatforms: ["X", "THREADS", "LINKEDIN"],
+    maxConnectedAccounts: 2,
+    publishedPostsPerMonth: 100,
   },
   GROWTH: {
     aiGenerationsPerMonth: null,
     trendResearch: true,
     replyDrafting: true,
-    reelsPerMonth: 20,
+    reelsPerMonth: 0,
     carouselsPerMonth: 50,
     textPlatforms: ["X", "THREADS", "LINKEDIN"],
+    maxConnectedAccounts: 5,
+    publishedPostsPerMonth: 300,
+  },
+  PRO: {
+    aiGenerationsPerMonth: null,
+    trendResearch: true,
+    replyDrafting: true,
+    reelsPerMonth: 0,
+    carouselsPerMonth: 100,
+    textPlatforms: ["X", "THREADS", "LINKEDIN"],
+    maxConnectedAccounts: 10,
+    publishedPostsPerMonth: 1_000,
   },
   AGENCY: {
     aiGenerationsPerMonth: null,
     trendResearch: true,
     replyDrafting: true,
-    reelsPerMonth: 100,
+    reelsPerMonth: 0,
     carouselsPerMonth: 200,
     textPlatforms: ["X", "THREADS", "LINKEDIN"],
+    maxConnectedAccounts: 25,
+    publishedPostsPerMonth: 2_500,
   },
 };
 

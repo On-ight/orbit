@@ -40,3 +40,37 @@ export async function countCarouselsThisMonth(accountId: string): Promise<number
 
   return prisma.approval.count({ where: { accountId, type: "CAROUSEL", createdAt: { gte: startOfMonth } } });
 }
+
+// Distinct from countAiGenerationsThisMonth — that one bounds draft/LLM-call
+// volume (Post rows created), this one bounds the number actually approved/
+// published (the number the pricing page advertises). Scoped to type "POST"
+// only (not REPLY) and counted by resolvedAt (when the approve action ran),
+// not createdAt (when it was drafted), since the cap is about publish
+// volume for a given month, not draft age.
+export async function countPublishedPostsThisMonth(accountId: string): Promise<number> {
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+
+  return prisma.approval.count({
+    where: { accountId, type: "POST", status: "APPROVED", resolvedAt: { gte: startOfMonth } },
+  });
+}
+
+// Checked by every app/api/connections/{platform}/start/route.ts before
+// redirecting into that platform's OAuth flow. Reconnecting a platform
+// that's already connected never counts as "new" — only adding a platform
+// beyond maxConnectedAccounts is blocked.
+export async function canConnectAnotherPlatform(
+  accountId: string,
+  platform: string,
+  maxConnectedAccounts: number,
+): Promise<boolean> {
+  const existing = await prisma.accountSocialToken.findUnique({
+    where: { accountId_platform: { accountId, platform } },
+  });
+  if (existing) return true;
+
+  const count = await prisma.accountSocialToken.count({ where: { accountId } });
+  return count < maxConnectedAccounts;
+}
