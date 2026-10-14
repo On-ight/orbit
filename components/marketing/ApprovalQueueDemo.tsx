@@ -9,6 +9,11 @@ interface DemoItem {
   meta: string;
   text: string;
   confirmText: string;
+  // Reel/Carousel items get a small thumbnail accent instead of (or
+  // alongside) plain quoted text, so the demo reads as "this is a video/
+  // image post" at a glance — matching how they really show up in the
+  // approval queue (components/approvals/ApprovalCard.tsx), not just text.
+  media?: "reel" | "carousel";
 }
 
 const ITEMS: DemoItem[] = [
@@ -30,6 +35,24 @@ const ITEMS: DemoItem[] = [
   },
   {
     id: "3",
+    tier: "approval",
+    tierLabel: "🟡 Needs approval",
+    meta: "Trend → Instagram Reel",
+    text: "AI-avatar Reel ready — \"3 lessons from rebuilding onboarding\" (0:42)",
+    confirmText: "✓ Publishing to Instagram",
+    media: "reel",
+  },
+  {
+    id: "4",
+    tier: "approval",
+    tierLabel: "🟡 Needs approval",
+    meta: "Trend → Instagram Carousel",
+    text: "5-slide carousel ready — \"Why most onboarding flows lose users\"",
+    confirmText: "✓ Publishing to Instagram",
+    media: "carousel",
+  },
+  {
+    id: "5",
     tier: "never",
     tierLabel: "🔴 Human only",
     meta: "Negative sentiment detected",
@@ -77,7 +100,20 @@ export function ApprovalQueueDemo() {
                 <span className="text-xs text-[var(--text-muted)]">{item.meta}</span>
               </div>
 
-              {state !== "editing" && <p className="text-sm text-[var(--text-primary)]">&quot;{text}&quot;</p>}
+              {state !== "editing" && (
+                <div className="flex items-start gap-3">
+                  {item.media && (
+                    <span
+                      aria-hidden
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-base text-white"
+                      style={{ background: "linear-gradient(135deg, #6229CE, #8E42FC 55%, #BC69EB)" }}
+                    >
+                      {item.media === "reel" ? "▶" : "▦"}
+                    </span>
+                  )}
+                  <p className="text-sm text-[var(--text-primary)]">&quot;{text}&quot;</p>
+                </div>
+              )}
 
               {item.tier !== "never" && state === "pending" && (
                 <div className="mt-3 flex gap-2">
