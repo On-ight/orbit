@@ -161,7 +161,19 @@ export default function SignupPage() {
           {loading ? "Creating account..." : "Create account"}
         </button>
 
-        <p className="mt-4 text-center text-sm text-neutral-500">
+        <p className="mt-4 text-center text-xs text-neutral-400">
+          By creating an account, you agree to Orbit&apos;s{" "}
+          <Link href="/terms" className="underline hover:text-neutral-600">
+            Terms of Service
+          </Link>{" "}
+          and{" "}
+          <Link href="/privacy" className="underline hover:text-neutral-600">
+            Privacy Policy
+          </Link>
+          .
+        </p>
+
+        <p className="mt-3 text-center text-sm text-neutral-500">
           Already have an account?{" "}
           <Link href="/login" className="font-medium text-[#8E42FC] hover:underline">
             Sign in

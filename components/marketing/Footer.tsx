@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PLATFORM_LINKS, PRODUCT_LINKS, COMPANY_LINKS } from "./nav-data";
+import { PLATFORM_LINKS, PRODUCT_LINKS, COMPANY_LINKS, LEGAL_LINKS } from "./nav-data";
 
 function LinkColumn({ title, links }: { title: string; links: { href: string; label: string }[] }) {
   return (
@@ -21,10 +21,11 @@ function LinkColumn({ title, links }: { title: string; links: { href: string; la
 export function Footer() {
   return (
     <footer className="border-t border-neutral-200">
-      <div className="mx-auto grid max-w-6xl gap-10 px-6 py-14 sm:grid-cols-3">
+      <div className="mx-auto grid max-w-6xl gap-10 px-6 py-14 sm:grid-cols-2 lg:grid-cols-4">
         <LinkColumn title="Platforms" links={PLATFORM_LINKS} />
         <LinkColumn title="Product" links={PRODUCT_LINKS} />
         <LinkColumn title="Company" links={COMPANY_LINKS} />
+        <LinkColumn title="Legal" links={LEGAL_LINKS} />
       </div>
       <div className="border-t border-neutral-200 py-6">
         <p className="mx-auto max-w-6xl px-6 text-sm text-neutral-500">

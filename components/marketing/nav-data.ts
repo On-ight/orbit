@@ -18,3 +18,9 @@ export const COMPANY_LINKS = [
   { href: "/blog", label: "Blog" },
   { href: "/pricing", label: "Pricing" },
 ];
+
+export const LEGAL_LINKS = [
+  { href: "/privacy", label: "Privacy Policy" },
+  { href: "/terms", label: "Terms of Service" },
+  { href: "/data-deletion", label: "Data Deletion" },
+];
