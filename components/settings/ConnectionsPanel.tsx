@@ -94,6 +94,8 @@ export function ConnectionsPanel({
 
           <a
             href="/api/connections/x/start"
+            target="_blank"
+            rel="noopener noreferrer"
             className="block rounded-lg px-4 py-2 text-center text-sm font-medium text-white transition hover:opacity-90"
             style={{ background: "linear-gradient(120deg, #6229CE, #BC69EB)" }}
           >
@@ -125,6 +127,8 @@ export function ConnectionsPanel({
 
           <a
             href="/api/connections/threads/start"
+            target="_blank"
+            rel="noopener noreferrer"
             className="block rounded-lg px-4 py-2 text-center text-sm font-medium text-white transition hover:opacity-90"
             style={{ background: "linear-gradient(120deg, #6229CE, #BC69EB)" }}
           >
@@ -156,6 +160,8 @@ export function ConnectionsPanel({
 
           <a
             href="/api/connections/linkedin/start"
+            target="_blank"
+            rel="noopener noreferrer"
             className="block rounded-lg px-4 py-2 text-center text-sm font-medium text-white transition hover:opacity-90"
             style={{ background: "linear-gradient(120deg, #6229CE, #BC69EB)" }}
           >
@@ -190,6 +196,8 @@ export function ConnectionsPanel({
 
           <a
             href="/api/connections/instagram/start"
+            target="_blank"
+            rel="noopener noreferrer"
             className="block rounded-lg px-4 py-2 text-center text-sm font-medium text-white transition hover:opacity-90"
             style={{ background: "linear-gradient(120deg, #6229CE, #BC69EB)" }}
           >
