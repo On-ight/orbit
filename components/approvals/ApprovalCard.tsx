@@ -54,14 +54,12 @@ function charLimitFor(platform: string): number {
 
 export function ApprovalCard({
   approval,
-  bufferPlatforms,
   instagramConnected,
   threadsConnected,
   xConnected,
   linkedinConnected,
 }: {
   approval: ApprovalCardData;
-  bufferPlatforms: string[];
   instagramConnected: boolean;
   threadsConnected: boolean;
   xConnected: boolean;
@@ -77,7 +75,6 @@ export function ApprovalCard({
   const [error, setError] = useState<string | null>(null);
 
   const limit = charLimitFor(approval.platform);
-  const bufferConfigured = bufferPlatforms.includes(approval.platform);
 
   async function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -134,24 +131,17 @@ export function ApprovalCard({
   const isX = approval.platform === "X";
   const isLinkedIn = approval.platform === "LINKEDIN";
   const canPublishLive =
-    bufferConfigured ||
     (isInstagram && instagramConnected) ||
     (isThreads && threadsConnected) ||
     (isX && xConnected) ||
     (isLinkedIn && linkedinConnected);
   // Instagram's publish is already async (an Inngest job, not an immediate
   // call) — see lib/inngest/functions/instagram-publish.ts — so it can
-  // delay its own start with step.sleepUntil the same way Buffer's
-  // scheduling already worked, without needing a different mechanism.
-  const canSchedule = bufferConfigured || (isInstagram && instagramConnected);
+  // delay its own start with step.sleepUntil.
+  const canSchedule = isInstagram && instagramConnected;
   const overLimit = editing ? draft.length > limit : displayContent.length > limit;
 
   function publishNote(): string {
-    if (bufferConfigured) {
-      return scheduledFor
-        ? `Approving this will schedule it via Buffer for ${new Date(scheduledFor).toLocaleString()}.`
-        : "Approving this will queue it via Buffer for the next available slot.";
-    }
     if (isX && xConnected) {
       return approval.type === "REPLY"
         ? "Approving this will post it directly to X as a real reply."

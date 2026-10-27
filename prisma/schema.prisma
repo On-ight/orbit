@@ -75,7 +75,6 @@ model Account {
   updatedAt            DateTime  @updatedAt
 
   users                User[]
-  bufferChannels       AccountBufferChannel[]
   socialTokens         AccountSocialToken[]
   mentions             Mention[]
   conversations        Conversation[]
@@ -107,18 +106,6 @@ model User {
   updatedAt    DateTime @updatedAt
 
   @@index([accountId])
-}
-
-model AccountBufferChannel {
-  id              String   @id @default(cuid())
-  accountId       String
-  account         Account  @relation(fields: [accountId], references: [id])
-  platform        String   // X | THREADS | LINKEDIN
-  bufferChannelId String
-
-  createdAt       DateTime @default(now())
-
-  @@unique([accountId, platform])
 }
 
 model AccountSocialToken {

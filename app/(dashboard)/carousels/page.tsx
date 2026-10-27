@@ -107,7 +107,6 @@ export default async function CarouselsPage() {
                 return (
                   <ErrorBoundary key={carousel.id} label="this Carousel's approval card">
                     <ApprovalCard
-                      bufferPlatforms={[]}
                       instagramConnected={instagramConnected}
                       threadsConnected={false}
                       xConnected={false}

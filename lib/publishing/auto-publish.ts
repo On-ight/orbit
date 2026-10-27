@@ -1,14 +1,13 @@
 import { prisma } from "@/lib/db/prisma";
-import { BufferPlatform, isBufferConfiguredForPlatform, schedulePostToBuffer } from "@/lib/publishing/buffer-client";
-
-const BUFFER_PLATFORMS: BufferPlatform[] = ["X", "THREADS", "LINKEDIN"];
+import { isXConnected, publishPostToX } from "@/lib/publishing/x-client";
 
 /**
  * Publishes an 🟢 Auto-tier approval immediately, without a human click —
  * only ever called when the account has autoApproveMode enabled, and only
  * for approvals already classified riskTier "AUTO" by the agent that
  * created them (never NEVER, never a post — posts stay approval-gated by
- * policy regardless of this setting, see content-agent.ts).
+ * policy regardless of this setting, see content-agent.ts). Only REPLY
+ * approvals reach here today (community-agent.ts), always platform "X".
  *
  * Deliberately kept separate from the "approve" branch of
  * app/api/approvals/[id]/route.ts rather than shared — that endpoint also
@@ -17,19 +16,24 @@ const BUFFER_PLATFORMS: BufferPlatform[] = ["X", "THREADS", "LINKEDIN"];
  * accidentally change the human-facing approve flow's behavior.
  */
 export async function autoPublishApproval(approvalId: string): Promise<void> {
-  const approval = await prisma.approval.findUnique({ where: { id: approvalId } });
+  const approval = await prisma.approval.findUnique({
+    where: { id: approvalId },
+    include: {
+      conversation: { select: { sourceMention: { select: { platformPostId: true } } } },
+    },
+  });
   if (!approval || approval.riskTier !== "AUTO" || approval.status !== "PENDING") return;
-
-  const bufferPlatform = BUFFER_PLATFORMS.find((p) => p === approval.platform);
-  if (!bufferPlatform || !(await isBufferConfiguredForPlatform(approval.accountId, bufferPlatform))) {
+  if (approval.platform !== "X" || !(await isXConnected(approval.accountId))) {
     // Nothing to publish to yet — leave it pending so a human still sees it.
     return;
   }
 
-  let bufferPostId: string;
+  let platformPostId: string;
   try {
-    const result = await schedulePostToBuffer(approval.accountId, approval.content, bufferPlatform);
-    bufferPostId = result.bufferPostId;
+    const replyToTweetId =
+      approval.type === "REPLY" ? approval.conversation?.sourceMention.platformPostId : undefined;
+    const result = await publishPostToX(approval.accountId, approval.content, replyToTweetId);
+    platformPostId = result.platformPostId;
   } catch {
     // Fail-safe: a publish failure must never vanish silently — leaving it
     // pending just means it stops being "automatic" and falls back to
@@ -42,8 +46,8 @@ export async function autoPublishApproval(approvalId: string): Promise<void> {
     data: {
       status: "APPROVED",
       resolvedAt: new Date(),
-      publishedVia: "BUFFER",
-      platformPostId: bufferPostId,
+      publishedVia: "X",
+      platformPostId,
     },
   });
 

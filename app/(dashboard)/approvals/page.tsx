@@ -2,7 +2,6 @@ import Link from "next/link";
 import { prisma } from "@/lib/db/prisma";
 import { ApprovalCard } from "@/components/approvals/ApprovalCard";
 import { EmptyState } from "@/components/EmptyState";
-import { activeBufferPlatforms } from "@/lib/publishing/buffer-client";
 import { isInstagramConnected } from "@/lib/publishing/instagram-client";
 import { isThreadsConnected } from "@/lib/publishing/threads-client";
 import { isXConnected } from "@/lib/publishing/x-client";
@@ -45,19 +44,12 @@ export default async function ApprovalsPage({
     orderBy: { createdAt: "desc" },
   });
 
-  const [rawBufferPlatforms, instagramConnected, threadsConnected, xConnected, linkedinConnected] = await Promise.all([
-    activeBufferPlatforms(currentUser.accountId),
+  const [instagramConnected, threadsConnected, xConnected, linkedinConnected] = await Promise.all([
     isInstagramConnected(currentUser.accountId),
     isThreadsConnected(currentUser.accountId),
     isXConnected(currentUser.accountId),
     isLinkedInConnected(currentUser.accountId),
   ]);
-  // Threads, X, and LinkedIn all moved off Buffer onto direct publishing —
-  // strip them out here so a leftover AccountBufferChannel row from before
-  // that change (if one still exists) can't make the card claim Buffer
-  // handles them when app/api/approvals/[id]/route.ts no longer attempts
-  // Buffer for any of them.
-  const bufferPlatforms = rawBufferPlatforms.filter((p) => p !== "THREADS" && p !== "X" && p !== "LINKEDIN");
 
   return (
     <div>
@@ -103,7 +95,6 @@ export default async function ApprovalsPage({
         {approvals.map((approval) => (
           <ApprovalCard
             key={approval.id}
-            bufferPlatforms={bufferPlatforms}
             instagramConnected={instagramConnected}
             threadsConnected={threadsConnected}
             xConnected={xConnected}

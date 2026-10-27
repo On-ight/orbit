@@ -110,7 +110,6 @@ export default async function ReelsPage() {
                 return (
                   <ErrorBoundary key={reel.id} label="this Reel's approval card">
                     <ApprovalCard
-                      bufferPlatforms={[]}
                       instagramConnected={instagramConnected}
                       threadsConnected={false}
                       xConnected={false}

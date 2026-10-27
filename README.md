@@ -7,9 +7,10 @@ knowledge base), Content Agent drafts an adapted variant per connected platform
 risk policy decides what the AI can do on its own versus what needs your
 sign-off. Runs itself every morning at 6am IST via cron, or on demand. Approved
 posts and replies publish for real once you've connected X, Threads, and/or
-LinkedIn directly (see below) — nothing publishes through Buffer anymore.
-AI-avatar Reels and photo Carousels (see Reels/Carousels in the app) publish
-straight to Instagram directly via Meta's own API too.
+LinkedIn directly (see below). AI-avatar Reels and photo Carousels (see
+Reels/Carousels in the app) publish straight to Instagram directly via
+Meta's own API too. Every platform publishes directly through its own API —
+there's no third-party scheduling service in the loop anywhere.
 
 ## Setup
 
@@ -43,7 +44,6 @@ Open [http://localhost:3000](http://localhost:3000). You'll be redirected to
 | `DASHBOARD_PASSWORD` | Shared password gating the whole app — change this before sharing the URL with anyone |
 | `SESSION_SECRET` | Signs the session cookie — use a long random string before deploying anywhere real |
 | `X_CLIENT_ID`, `X_CLIENT_SECRET` | OAuth 2.0 + PKCE app credentials from the X Developer Portal — powers the per-account "Connect X" button in Settings, used for both reading mentions and publishing directly (one connection, not two). See below. |
-| `BUFFER_API_KEY` | Personal Buffer API key. No platform currently publishes through it (X/Threads/Instagram/LinkedIn all publish directly) — the code path still works and is kept around in case a platform ever needs to move back onto it, just dormant. |
 | `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET` | From a LinkedIn Developer App — powers direct LinkedIn publishing to your own profile. See below. |
 | `CRON_SECRET` | Random string Vercel sends as `Authorization: Bearer <this>` when it fires the daily cron job. Only matters on Vercel, but set here too so local `curl` tests of the cron route work. |
 | `BLOB_READ_WRITE_TOKEN` | Powers the image attachment upload on LinkedIn approval cards (`/api/upload`) — direct LinkedIn publishing fetches the image's bytes from this Blob URL and re-uploads them to LinkedIn's own Images API at publish time. Auto-injected once you add Blob storage from the Vercel dashboard's Storage tab. |
@@ -71,13 +71,13 @@ there's no separate "direct publish" credential anymore. The same
 4. Copy the **Client ID**/**Client Secret** into `.env.local` as `X_CLIENT_ID` / `X_CLIENT_SECRET`.
 5. Restart `npm run dev`, go to Settings, click **Connect X**.
 
-X moved to **prepaid-credits-only** pay-per-use pricing in Feb 2026 — posting costs ~$0.015/post (~$0.20 if it contains a link), reading costs ~$0.005/post and ~$0.01/user. There's no postpaid "card on file" option and no free tier — buy a credit balance in the X Developer Portal before this will work, and set a per-cycle spending cap while you're there. Direct X posting is always immediate — there's no scheduling on this path, unlike Buffer. `REPLY`-type approvals post as genuine in-thread @-replies (not standalone posts) since the real tweet being replied to is already on hand from mention discovery.
+X moved to **prepaid-credits-only** pay-per-use pricing in Feb 2026 — posting costs ~$0.015/post (~$0.20 if it contains a link), reading costs ~$0.005/post and ~$0.01/user. There's no postpaid "card on file" option and no free tier — buy a credit balance in the X Developer Portal before this will work, and set a per-cycle spending cap while you're there. Direct X posting is always immediate — there's no scheduling on this path. `REPLY`-type approvals post as genuine in-thread @-replies (not standalone posts) since the real tweet being replied to is already on hand from mention discovery.
 
 ## Connecting LinkedIn directly
 
 LinkedIn posts (`POST` approvals for the LinkedIn platform) publish straight
 to your own profile via LinkedIn's REST API, through a real per-account OAuth
-connect button in Settings — not Buffer.
+connect button in Settings.
 
 1. Create an app at [LinkedIn Developers](https://www.linkedin.com/developers/apps) and add two self-serve products to it: **Sign In with LinkedIn using OpenID Connect** and **Share on LinkedIn**. Both grant immediately — no App Review needed to post to your own profile.
 2. In the app's **Auth** tab, add `https://<your-domain>/api/connections/linkedin/callback` as an authorized redirect URL.
@@ -99,17 +99,16 @@ URL directly).
 
 **What's live vs. simulated right now:** approving a `POST` publishes for
 real once that platform is connected (X, Threads, Instagram, and LinkedIn
-all publish directly — nothing goes through Buffer anymore). Approving a
+all publish directly). Approving a
 `REPLY` posts a genuine in-thread @-reply once X is connected —
 `discoverMentions()` (`lib/agents/discover-mentions.ts`) pulls real mentions
 and keyword matches via that same connection, not mock data. Nothing
 auto-posts — every item sits in the queue until you explicitly approve it.
 
-## Connecting Instagram directly (for Reels/Carousels — not Buffer)
+## Connecting Instagram directly (for Reels/Carousels)
 
-Buffer doesn't cover Instagram here — Reels/Carousels publish straight to
-Meta's own Content Publishing API instead, via a real per-account OAuth
-connect button in Settings.
+Reels/Carousels publish straight to Meta's own Content Publishing API, via
+a real per-account OAuth connect button in Settings.
 
 1. Create a Meta Developer App at [developers.facebook.com](https://developers.facebook.com/apps) (type: **Business**).
 2. Add the **Instagram** product, using **Instagram API with Instagram Login** (not Facebook Login) — this works directly against a Business/Creator Instagram account, no linked Facebook Page needed.
@@ -126,10 +125,10 @@ dashboard → Apps → your app → Sync) or events for it will be silently
 dropped — this bit Reels earlier for the exact same reason.
 
 Reels/Carousels can also be **scheduled** for a future time instead of
-publishing right away — the same "Schedule for" picker Buffer approvals
-show, now also shown for Instagram items once connected. Under the hood
-this is a durable `step.sleepUntil` inside the Inngest function, not a
-separate cron — it costs nothing while waiting, even for a schedule days out.
+publishing right away — a "Schedule for" picker shown on Instagram items
+once connected. Under the hood this is a durable `step.sleepUntil` inside
+the Inngest function, not a separate cron — it costs nothing while waiting,
+even for a schedule days out.
 
 Every agent cycle also pulls **per-post Instagram insights** (likes,
 comments, reach, saves) for Reels/Carousels published in the last 30 days,
@@ -145,11 +144,11 @@ mechanism, it rides the same `buildSystemPrompt()` every agent already
 uses) and surfaced on the new **Marketing tips** page alongside general,
 always-shown best-practice advice.
 
-## Connecting Threads directly (not Buffer)
+## Connecting Threads directly
 
 Same deal as Instagram — Threads posts (`POST` approvals for the Threads
 platform) publish straight to Meta's Threads API via their own OAuth connect
-button, not Buffer.
+button.
 
 1. In the **same** Meta Developer App as Instagram, add the **Threads** product.
 2. Add `https://<your-domain>/api/connections/threads/callback` as a valid OAuth redirect URI, and note the **Threads App ID**/**Threads App Secret** — this is a separate credential pair from the Instagram one even though it's the same app; Threads' endpoints reject the Instagram pair.
@@ -231,10 +230,10 @@ the whole "login system" for now.
   ran on a fixed seed batch and silently found "nothing new" once it was
   exhausted.
 - **One trend, one draft per connected platform.** Content Agent drafts an
-  X/Threads/LinkedIn variant per trend for whichever platforms have a Buffer
-  channel configured, each respecting that platform's own character limit
-  (280/500/3000). Falls back to X-only direct posting if Buffer isn't
-  configured for anything.
+  X/Threads/LinkedIn variant per trend for whichever of those three this
+  account has both connected directly and the account's plan tier allows
+  (`PlanLimits.textPlatforms` — Free only allows Threads), each respecting
+  that platform's own character limit (280/500/3000).
 - **Risk tiers.** Every mention/trend passes through a keyword pre-filter plus
   the model's own self-assessment (`lib/agents/risk-tiers.ts`). The two
   signals always escalate to the more conservative tier, and any classification
@@ -264,4 +263,6 @@ See `prisma/schema.prisma` for the data model and `lib/agents/` for the agents:
 `discover-trends.ts` (live web search), `trend-agent.ts`, `content-agent.ts`
 (multi-platform drafting), `community-agent.ts` (replies), plus the shared
 LLM client (`llm-client.ts`) and risk-tier gate (`risk-tiers.ts`).
-Publishing lives in `lib/publishing/` (`buffer-client.ts`, `x-client.ts`).
+Publishing lives in `lib/publishing/` (`x-client.ts`, `threads-client.ts`,
+`linkedin-client.ts`, `instagram-client.ts`) — one direct-API client per
+platform, no third-party scheduler in between.
