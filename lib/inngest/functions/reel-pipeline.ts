@@ -1,21 +1,37 @@
+import { put } from "@vercel/blob";
 import { prisma } from "@/lib/db/prisma";
-import { SITE_URL } from "@/lib/site-url";
+import { inngest, REEL_GENERATION_REQUESTED, type ReelGenerationRequestedData } from "@/lib/inngest/client";
 import {
-  inngest,
-  REEL_GENERATION_REQUESTED,
-  HEYGEN_VIDEO_COMPLETED,
-  type ReelGenerationRequestedData,
-} from "@/lib/inngest/client";
-import { submitHeygenVideo } from "@/lib/reels/heygen-client";
+  generateStoryboardGrid,
+  cropStoryboardPanels,
+  generateSceneVideo,
+  generateNarrationAudio,
+  type StoryboardScene,
+} from "@/lib/reels/gemini-client";
+import { stitchSceneVideos } from "@/lib/reels/video-stitcher";
 import { generateReelDescriptionAndHashtags, reelScriptSchema } from "@/lib/agents/reel-script-agent";
 
+async function fetchBuffer(url: string): Promise<Buffer> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to download ${url} (HTTP ${res.status})`);
+  return Buffer.from(await res.arrayBuffer());
+}
+
+function uploadBuffer(name: string, buffer: Buffer, contentType: string): Promise<string> {
+  return put(name, buffer, { access: "public", addRandomSuffix: true, contentType }).then((blob) => blob.url);
+}
+
 /**
- * Renders one Reel as an AI-avatar video via HeyGen (avatar + voice +
- * captions all generated in one call, webhook-driven completion — not
- * polled) -> wait for the webhook -> write description/hashtags -> create
- * the Approval row. The outer try/catch exists only to make sure the Reel
- * ends up FAILED in our own DB rather than stuck at RENDERING forever once
- * Inngest's own step retries exhaust.
+ * Renders one Reel as a storyboard-driven motion-graphics video: one
+ * AI-generated image split into per-scene panels, each animated into a
+ * short clip, narrated, and stitched together — replacing HeyGen's
+ * avatar-video pipeline. Every step uploads its own output to Blob and
+ * returns just the URL, keeping Inngest's step-memoization payloads small
+ * and giving the final stitch step stable URLs to download from; each
+ * step.run() is its own checkpoint, so no single Vercel invocation needs to
+ * survive the whole multi-minute pipeline. The outer try/catch exists only
+ * to make sure the Reel ends up FAILED in our own DB rather than stuck at
+ * RENDERING forever once Inngest's own step retries exhaust.
  */
 export const reelPipelineFn = inngest.createFunction(
   {
@@ -30,8 +46,8 @@ export const reelPipelineFn = inngest.createFunction(
     try {
       const reel = await step.run("load-reel", () => prisma.reel.findUnique({ where: { id: reelId } }));
 
-      if (!reel || !reel.script || !reel.avatarId || !reel.voiceId) {
-        throw new Error(`Reel ${reelId} is missing a selected script/avatar — cannot render.`);
+      if (!reel || !reel.script) {
+        throw new Error(`Reel ${reelId} is missing a selected script — cannot render.`);
       }
 
       const parsedScript = reelScriptSchema.safeParse(reel.script);
@@ -39,32 +55,45 @@ export const reelPipelineFn = inngest.createFunction(
         throw new Error(`Reel ${reelId}'s stored script failed validation: ${parsedScript.error.message}`);
       }
       const script = parsedScript.data;
-      const avatarId = reel.avatarId;
-      const voiceId = reel.voiceId;
+      const scenes: StoryboardScene[] = script.scenes.map((s) => ({ type: s.type, text: s.text }));
 
-      const heygenVideoId = await step.run("submit-avatar-video", () => {
-        // One continuous script for the avatar to deliver as a single take —
-        // reads naturally as hook followed by the rest of the scenes, rather
-        // than a scene-cut composited video.
-        const fullScript = [script.hook, ...script.scenes.map((s) => s.text)].join(" ");
-        const callbackUrl = `${SITE_URL}/api/webhooks/heygen?secret=${process.env.HEYGEN_WEBHOOK_SECRET}`;
-        return submitHeygenVideo({ avatarId, voiceId, script: fullScript, callbackUrl, callbackId: reelId });
+      const gridUrl = await step.run("generate-storyboard-grid", async () => {
+        const grid = await generateStoryboardGrid(scenes, script.title);
+        return uploadBuffer(`reel-${reelId}-storyboard.png`, grid, "image/png");
       });
 
-      await step.run("record-video-id", () => prisma.reel.update({ where: { id: reelId }, data: { heygenVideoId } }));
-
-      const webhookEvent = await step.waitForEvent("wait-for-avatar-video", {
-        event: HEYGEN_VIDEO_COMPLETED,
-        match: "data.reelId",
-        timeout: "10m",
+      const panelUrls = await step.run("crop-storyboard-panels", async () => {
+        const grid = await fetchBuffer(gridUrl);
+        const panels = await cropStoryboardPanels(grid, scenes.length);
+        return Promise.all(
+          panels.map((panel, i) => uploadBuffer(`reel-${reelId}-panel-${i + 1}.png`, panel, "image/png")),
+        );
       });
 
-      if (!webhookEvent || webhookEvent.data.status !== "completed" || !webhookEvent.data.videoUrl) {
-        await step.run("mark-failed", () => prisma.reel.update({ where: { id: reelId }, data: { status: "FAILED" } }));
-        return { reelId, status: "FAILED" as const };
+      const clipUrls: string[] = [];
+      for (let i = 0; i < scenes.length; i++) {
+        const clipUrl = await step.run(`generate-scene-video-${i + 1}`, async () => {
+          const panel = await fetchBuffer(panelUrls[i]);
+          const clip = await generateSceneVideo(panel, scenes[i].text, script.scenes[i].duration);
+          return uploadBuffer(`reel-${reelId}-clip-${i + 1}.mp4`, clip, "video/mp4");
+        });
+        clipUrls.push(clipUrl);
       }
 
-      const videoUrl = webhookEvent.data.videoUrl;
+      const narrationUrl = await step.run("generate-narration", async () => {
+        const fullNarration = [script.hook, ...script.scenes.map((s) => s.text)].join(" ");
+        const audio = await generateNarrationAudio(fullNarration);
+        return uploadBuffer(`reel-${reelId}-narration.wav`, audio, "audio/wav");
+      });
+
+      const videoUrl = await step.run("stitch-video", async () => {
+        const [clips, narration] = await Promise.all([
+          Promise.all(clipUrls.map(fetchBuffer)),
+          fetchBuffer(narrationUrl),
+        ]);
+        const finalVideo = await stitchSceneVideos(clips, narration);
+        return uploadBuffer(`reel-${reelId}-final.mp4`, finalVideo, "video/mp4");
+      });
 
       const description = await step.run("generate-description", () =>
         generateReelDescriptionAndHashtags(accountId, script.title, script.hook),

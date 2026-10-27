@@ -19,17 +19,6 @@ export interface ReelGenerationRequestedData {
   reelId: string;
 }
 
-// Sent by app/api/webhooks/heygen/route.ts once HeyGen's own
-// avatar_video.success/fail callback fires — the reel-pipeline function's
-// step.waitForEvent matches on data.reelId against this event.
-export const HEYGEN_VIDEO_COMPLETED = "heygen/video.completed" as const;
-
-export interface HeygenVideoCompletedData {
-  reelId: string;
-  status: "completed" | "failed";
-  videoUrl: string | null;
-}
-
 // Sent by app/api/approvals/[id]/route.ts when an Instagram Reel/Carousel
 // gets approved and the account has a direct Instagram connection — Meta's
 // own container-processing + publish round-trip can take minutes (their own

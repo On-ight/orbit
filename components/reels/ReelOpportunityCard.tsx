@@ -10,14 +10,6 @@ interface TrendSummary {
   summary: string;
 }
 
-interface HeygenAvatar {
-  id: string;
-  name: string;
-  previewImageUrl: string;
-  ready: boolean;
-  source: "mine" | "stock";
-}
-
 interface ReelScriptVersion {
   angle: string;
   title: string;
@@ -71,30 +63,12 @@ export function ReelOpportunityCard({ trend, disabled }: { trend: TrendSummary; 
   const [reelId, setReelId] = useState<string | null>(null);
   const [versions, setVersions] = useState<Record<VersionKey, ReelScriptVersion> | null>(null);
   const [selectedKey, setSelectedKey] = useState<VersionKey>("versionA");
-  const [avatars, setAvatars] = useState<HeygenAvatar[] | null>(null);
-  const [avatarsError, setAvatarsError] = useState<string | null>(null);
-  const [selectedAvatarId, setSelectedAvatarId] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, []);
-
-  useEffect(() => {
-    fetch("/api/reels/avatars")
-      .then((res) => res.json())
-      .then((data) => {
-        if (!data.avatars) throw new Error(data?.error ?? "Failed to load avatars");
-        setAvatars(data.avatars);
-        const firstReady = data.avatars.find((a: HeygenAvatar) => a.ready);
-        if (firstReady) setSelectedAvatarId(firstReady.id);
-      })
-      .catch((err) => {
-        console.error("Failed to load avatars:", err);
-        setAvatarsError(err instanceof Error ? err.message : String(err));
-      });
   }, []);
 
   function pollStatus(id: string) {
@@ -137,14 +111,14 @@ export function ReelOpportunityCard({ trend, disabled }: { trend: TrendSummary; 
   }
 
   async function handleSelectVersion() {
-    if (!reelId || !selectedAvatarId) return;
+    if (!reelId) return;
     setPhase("selecting");
     setError(null);
     try {
       const res = await fetch(`/api/reels/${reelId}/select-version`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ versionKey: selectedKey, avatarId: selectedAvatarId }),
+        body: JSON.stringify({ versionKey: selectedKey }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Failed to start rendering");
@@ -212,83 +186,8 @@ export function ReelOpportunityCard({ trend, disabled }: { trend: TrendSummary; 
             })}
           </div>
 
-          <div>
-            <p className="mb-1.5 text-xs font-medium text-[var(--text-muted)]">
-              Influencer — who delivers this Reel
-            </p>
-            {avatarsError && (
-              <p className="text-xs text-[var(--status-critical)]">
-                Couldn&apos;t load avatars: {avatarsError}
-              </p>
-            )}
-            {!avatarsError && !avatars && (
-              <p className="text-xs text-[var(--text-muted)]">Loading avatars…</p>
-            )}
-            {avatars && avatars.length === 0 && (
-              <p className="text-xs text-[var(--text-muted)]">
-                No avatars available right now — try again shortly.
-              </p>
-            )}
-            {avatars && avatars.length > 0 && (
-              <div className="space-y-3">
-                {([
-                  { key: "mine" as const, label: "Your avatars" },
-                  { key: "stock" as const, label: "HeyGen stock avatars" },
-                ] as const).map(({ key, label }) => {
-                  const group = avatars.filter((a) => a.source === key);
-                  if (group.length === 0) {
-                    return key === "mine" ? (
-                      <p key={key} className="text-xs text-[var(--text-muted)]">
-                        No cloned avatar yet — create a digital twin on your HeyGen account, or pick a
-                        stock avatar below.
-                      </p>
-                    ) : null;
-                  }
-                  return (
-                    <div key={key}>
-                      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                        {label}
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {group.map((avatar) => (
-                          <button
-                            key={avatar.id}
-                            type="button"
-                            disabled={!avatar.ready}
-                            onClick={() => setSelectedAvatarId(avatar.id)}
-                            title={avatar.ready ? undefined : "Still processing on HeyGen — not ready yet"}
-                            className="flex items-center gap-2 rounded-md border px-2 py-1.5 text-left text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
-                            style={
-                              selectedAvatarId === avatar.id
-                                ? { borderColor: "var(--accent)", background: "var(--accent-soft)", color: "var(--accent)" }
-                                : { borderColor: "var(--border)", color: "var(--text-secondary)" }
-                            }
-                          >
-                            {avatar.previewImageUrl && (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={avatar.previewImageUrl}
-                                alt={avatar.name}
-                                width={32}
-                                height={32}
-                                className="h-8 w-8 rounded-full border border-[var(--border)] object-cover"
-                              />
-                            )}
-                            {avatar.name}
-                            {!avatar.ready && " (processing)"}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
           <button
             onClick={handleSelectVersion}
-            disabled={!selectedAvatarId}
             className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Generate Reel
@@ -302,7 +201,7 @@ export function ReelOpportunityCard({ trend, disabled }: { trend: TrendSummary; 
 
       {phase === "rendering" && (
         <div className="mt-4 space-y-1 text-sm text-[var(--text-muted)]">
-          <p>✦ Your AI influencer is filming this Reel — this usually takes a couple of minutes.</p>
+          <p>✦ Generating your Reel&apos;s storyboard, animation, and voiceover — this usually takes a couple of minutes.</p>
         </div>
       )}
 
@@ -317,7 +216,7 @@ export function ReelOpportunityCard({ trend, disabled }: { trend: TrendSummary; 
 
       {phase === "failed" && (
         <p className="mt-4 text-sm text-[var(--status-critical)]">
-          Rendering failed. Try again, or check that your HeyGen setup is configured correctly.
+          Rendering failed. Try again in a moment.
         </p>
       )}
     </div>

@@ -6,8 +6,6 @@ import { inngest, REEL_GENERATION_REQUESTED } from "@/lib/inngest/client";
 import { limitsForTier } from "@/lib/billing/plan-limits";
 import { countReelsThisMonth } from "@/lib/billing/usage";
 import { reelScriptSchema } from "@/lib/agents/reel-script-agent";
-import { friendlyLlmErrorMessage } from "@/lib/agents/llm-client";
-import { listHeygenAvatars } from "@/lib/reels/heygen-client";
 
 const VERSION_KEYS = ["versionA", "versionB", "versionC"] as const;
 type VersionKey = (typeof VERSION_KEYS)[number];
@@ -16,34 +14,25 @@ function isVersionKey(value: unknown): value is VersionKey {
   return typeof value === "string" && (VERSION_KEYS as readonly string[]).includes(value);
 }
 
+// Each scene becomes its own Gemini Omni Flash image-to-video call at
+// ~$0.10/sec — the real vendor-spend driver for this pipeline. The script
+// agent is prompted to keep scenes short, but a script that ignores that
+// guidance shouldn't be able to blow past the cost budget, so this clamps
+// per-scene duration server-side rather than trusting prompt adherence.
+const MAX_SCENE_DURATION_SECONDS = 4;
+
 // This is where the monthly Reel quota is actually enforced — picking a
-// version is the step that triggers real vendor spend (the HeyGen avatar
-// render), unlike generate-scripts which is cheap LLM-only exploration.
-// avatarId is validated against the account's live HeyGen avatar list
-// (rather than trusted as-is) so a stale/tampered id can't reach the
-// render call — its defaultVoiceId is captured here too, since HeyGen
-// bundles a cloned voice with each digital-twin avatar.
+// version is the step that triggers real vendor spend (the storyboard image
+// + per-scene video + narration render), unlike generate-scripts which is
+// cheap LLM-only exploration.
 export const POST = withAuth<{ params: Promise<{ id: string }> }>(
   async (request, { params, user: currentUser }) => {
     const { id } = await params;
     const body = await request.json().catch(() => null);
     const versionKey = body?.versionKey;
-    const avatarId = body?.avatarId;
 
-    if (!isVersionKey(versionKey) || typeof avatarId !== "string" || !avatarId) {
-      return NextResponse.json({ error: "Invalid versionKey/avatarId" }, { status: 400 });
-    }
-
-    let avatars;
-    try {
-      avatars = await listHeygenAvatars();
-    } catch (err) {
-      console.error("listHeygenAvatars failed:", err);
-      return NextResponse.json({ error: friendlyLlmErrorMessage(err) }, { status: 502 });
-    }
-    const avatar = avatars.find((a) => a.id === avatarId);
-    if (!avatar || !avatar.ready) {
-      return NextResponse.json({ error: "That avatar isn't available right now" }, { status: 400 });
+    if (!isVersionKey(versionKey)) {
+      return NextResponse.json({ error: "Invalid versionKey" }, { status: 400 });
     }
 
     const reel = await prisma.reel.findUnique({ where: { id } });
@@ -69,13 +58,19 @@ export const POST = withAuth<{ params: Promise<{ id: string }> }>(
       );
     }
 
+    const clampedScript = {
+      ...parsedScript.data,
+      scenes: parsedScript.data.scenes.map((scene) => ({
+        ...scene,
+        duration: Math.min(scene.duration, MAX_SCENE_DURATION_SECONDS),
+      })),
+    };
+
     await prisma.reel.update({
       where: { id },
       data: {
         status: "RENDERING",
-        avatarId: avatar.id,
-        voiceId: avatar.defaultVoiceId,
-        script: parsedScript.data,
+        script: clampedScript,
       },
     });
 

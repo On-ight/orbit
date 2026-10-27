@@ -7,8 +7,8 @@ knowledge base), Content Agent drafts an adapted variant per connected platform
 risk policy decides what the AI can do on its own versus what needs your
 sign-off. Runs itself every morning at 6am IST via cron, or on demand. Approved
 posts and replies publish for real once you've connected X, Threads, and/or
-LinkedIn directly (see below). AI-avatar Reels and photo Carousels (see
-Reels/Carousels in the app) publish straight to Instagram directly via
+LinkedIn directly (see below). AI-generated Reels (storyboard animation +
+voiceover) and photo Carousels (see Reels/Carousels in the app) publish straight to Instagram directly via
 Meta's own API too. Every platform publishes directly through its own API —
 there's no third-party scheduling service in the loop anywhere.
 
@@ -49,9 +49,8 @@ Open [http://localhost:3000](http://localhost:3000). You'll be redirected to
 | `BLOB_READ_WRITE_TOKEN` | Powers the image attachment upload on LinkedIn approval cards (`/api/upload`) — direct LinkedIn publishing fetches the image's bytes from this Blob URL and re-uploads them to LinkedIn's own Images API at publish time. Auto-injected once you add Blob storage from the Vercel dashboard's Storage tab. |
 | `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY` | From an Inngest account (app.inngest.com) — runs the agent cycle pipeline as durable background jobs instead of inline in the request. Locally, `npx inngest-cli@latest dev` works without these. |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | From an Upstash Redis database (upstash.com) — backs rate limiting and short-TTL caching. |
-| `NEXT_PUBLIC_SITE_URL` | This app's own canonical public URL (e.g. `https://orbitai.co.in`) — already used for OAuth redirect URIs; the HeyGen webhook callback (built inside a background job, with no incoming request to derive a host from) reuses this same convention rather than a separate variable. Falls back to `http://localhost:3000` if unset. |
-| `HEYGEN_API_KEY` | From a HeyGen account (heygen.com) — generates the AI-avatar Reel videos (avatar, voice, and captions all in one call). Also backs the avatar picker on the Reel-generation flow, which lists the account's own digital-twin avatars live via `GET /v3/avatars/looks`, plus HeyGen's premade stock presenters as a fallback/alternative — so there's always something to pick even before you've cloned your own avatar. Note HeyGen bills API usage through its own separate wallet, not your Studio plan's credits — top that up separately in HeyGen's account settings under Usage, or video generation fails with an "insufficient credits" error even if your Studio dashboard shows credits remaining. |
-| `HEYGEN_WEBHOOK_SECRET` | Random string appended to the webhook callback URL as `?secret=` — HeyGen calls this route with no session, so this is the payload-authenticity check. |
+| `NEXT_PUBLIC_SITE_URL` | This app's own canonical public URL (e.g. `https://orbitai.co.in`) — already used for OAuth redirect URIs. Falls back to `http://localhost:3000` if unset. |
+| `GEMINI_API_KEY` | From a Google AI Studio / Gemini API account (ai.google.dev) — generates Reel videos end-to-end: one storyboard image (`gemini-nano-banana-2.1`), a short animated clip per scene (`gemini-omni-1.1-flash`), and a narration voiceover (`gemini-3.8-flash-lite-tts`), all through the same key via the Interactions API. See `lib/reels/gemini-client.ts`. |
 | `UNSPLASH_ACCESS_KEY` | Free Unsplash developer app access key (unsplash.com/developers) — backs Carousel slide background photos. Optional: without it, Carousels still render, just with the plain gradient look instead of a photo per slide. Demo apps are capped at 50 requests/hour. |
 | `RESEND_API_KEY` | From a free Resend account (resend.com) — sends the "agent run completed/failed" email after each cycle. Optional: without it, runs still complete normally, the email step is just a silent no-op. |
 | `RESEND_FROM_EMAIL` | Optional. The verified sender address once you've verified your own domain in Resend (e.g. `Orbit <notifications@orbitai.co.in>`). Without it, falls back to Resend's shared test sender (`onboarding@resend.dev`), which only delivers to the Resend account's own owner — fine for trying this out, not for real users. |
@@ -119,7 +118,7 @@ a real per-account OAuth connect button in Settings.
 
 Publishing itself is async (Meta's own container-processing step can take a
 couple minutes), handled by the `instagram-publish` Inngest function — same
-pattern as the HeyGen Reel-render pipeline. **If you add this function
+durable step-based pattern as the `reel-pipeline` render function. **If you add this function
 after Inngest was already synced once, you need to manually re-sync** (Inngest
 dashboard → Apps → your app → Sync) or events for it will be silently
 dropped — this bit Reels earlier for the exact same reason.

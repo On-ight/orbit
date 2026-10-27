@@ -66,11 +66,12 @@ export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
     aiGenerationsPerMonth: null,
     trendResearch: true,
     replyDrafting: true,
-    // No tier includes Reel/video generation by default anymore — it's a
-    // paid add-on per the current pricing copy. No credit-purchase system
-    // exists yet to actually sell that add-on, so for now this is simply 0
-    // on every paid tier rather than a number nothing can fulfill.
-    reelsPerMonth: 0,
+    // Sized against the storyboard+Gemini Omni Flash pipeline's real cost
+    // (~$1.05-1.25/Reel: one storyboard image + per-scene video + narration)
+    // — see lib/reels/gemini-client.ts. Real, included allowances, not the
+    // "paid add-on" model this used to be (that add-on was never actually
+    // sellable — no credit-purchase system existed to charge for it).
+    reelsPerMonth: 2,
     carouselsPerMonth: 15,
     textPlatforms: ["X", "THREADS", "LINKEDIN"],
     maxConnectedAccounts: 2,
@@ -80,7 +81,7 @@ export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
     aiGenerationsPerMonth: null,
     trendResearch: true,
     replyDrafting: true,
-    reelsPerMonth: 0,
+    reelsPerMonth: 5,
     carouselsPerMonth: 50,
     textPlatforms: ["X", "THREADS", "LINKEDIN"],
     maxConnectedAccounts: 5,
@@ -90,7 +91,7 @@ export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
     aiGenerationsPerMonth: null,
     trendResearch: true,
     replyDrafting: true,
-    reelsPerMonth: 0,
+    reelsPerMonth: 12,
     carouselsPerMonth: 100,
     textPlatforms: ["X", "THREADS", "LINKEDIN"],
     maxConnectedAccounts: 10,
@@ -100,7 +101,7 @@ export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
     aiGenerationsPerMonth: null,
     trendResearch: true,
     replyDrafting: true,
-    reelsPerMonth: 0,
+    reelsPerMonth: 25,
     carouselsPerMonth: 200,
     textPlatforms: ["X", "THREADS", "LINKEDIN"],
     maxConnectedAccounts: 25,

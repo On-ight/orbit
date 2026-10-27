@@ -70,7 +70,7 @@ const TIERS: { tier: PlanTier; name: string; audience: string; features: string[
       "Content calendar and scheduling",
       "Basic brand voice settings",
       "One workspace",
-      "No included HeyGen video generation",
+      reelsLine("BUILDER"),
     ],
   },
   {
@@ -86,7 +86,7 @@ const TIERS: { tier: PlanTier; name: string; audience: string; features: string[
       "Brand voice and reusable content formats",
       "One workspace",
       "Basic publishing activity and performance tracking",
-      "Video generation available as a paid add-on",
+      reelsLine("GROWTH"),
     ],
   },
   {
@@ -101,7 +101,7 @@ const TIERS: { tier: PlanTier; name: string; audience: string; features: string[
       "Team collaboration and approval workflows",
       "Advanced scheduling controls",
       "More detailed performance reporting",
-      "Optional video-generation credits",
+      reelsLine("PRO"),
     ],
   },
   {
@@ -116,7 +116,7 @@ const TIERS: { tier: PlanTier; name: string; audience: string; features: string[
       "Client-specific brand voice settings",
       "Consolidated publishing overview",
       "Higher usage limits and priority support",
-      "Video credits purchased separately",
+      reelsLine("AGENCY"),
     ],
   },
 ];

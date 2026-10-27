@@ -31,8 +31,9 @@ export async function countReelsThisMonth(accountId: string): Promise<number> {
 }
 
 // Counted separately from Reels — Carousels render via next/og in-process
-// (no per-unit vendor cost like HeyGen's avatar render), so this cap exists
-// to bound LLM-call volume, not vendor spend, and can be more generous.
+// (no per-unit vendor cost like Reels' Gemini image/video/narration calls),
+// so this cap exists to bound LLM-call volume, not vendor spend, and can be
+// more generous.
 export async function countCarouselsThisMonth(accountId: string): Promise<number> {
   const startOfMonth = new Date();
   startOfMonth.setDate(1);

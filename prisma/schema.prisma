@@ -364,10 +364,10 @@ model Reel {
   // OPPORTUNITY | SCRIPT_OPTIONS | RENDERING | READY | FAILED | APPROVED | REJECTED
   status             String    @default("SCRIPT_OPTIONS")
 
-  // The chosen HeyGen digital-twin avatar (GET /v3/avatars/looks) — set at
-  // select-version time, once per Reel. voiceId is that avatar's own
-  // default_voice_id, captured alongside it rather than re-fetched at render
-  // time, so a picker change doesn't retroactively affect an in-flight Reel.
+  // Leftover from the HeyGen avatar-video pipeline (replaced by the
+  // storyboard+Gemini pipeline in lib/reels/gemini-client.ts) — no longer
+  // written or read. Left in place since they're already nullable; dropping
+  // them is pure cleanup, not required for the current pipeline to work.
   avatarId           String?
   voiceId            String?
 
@@ -387,9 +387,8 @@ model Reel {
   description        String?
   hashtags           String?   // comma-separated, matches discoveryKeywords/matchedKeywords convention
 
-  // HeyGen's own video id (returned synchronously from the submit call) —
-  // kept for support/debugging; correlation with the webhook actually
-  // happens via callback_id (this row's own id), not this field.
+  // Leftover from the HeyGen avatar-video pipeline — no longer written or
+  // read (see the avatarId/voiceId comment above).
   heygenVideoId      String?
 
   sourceTrendId      String?

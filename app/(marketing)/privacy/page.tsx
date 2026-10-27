@@ -105,7 +105,7 @@ export default function PrivacyPage() {
             <li><strong className="text-neutral-800">Inngest</strong> — background job orchestration for automated agent runs.</li>
             <li><strong className="text-neutral-800">Firebase (Google)</strong> — account authentication.</li>
             <li><strong className="text-neutral-800">Groq</strong> — AI text generation for research, drafting, and classification.</li>
-            <li><strong className="text-neutral-800">HeyGen</strong> — AI-avatar video generation for Reels.</li>
+            <li><strong className="text-neutral-800">Google Gemini API</strong> — AI image, video, and voice generation for Reels.</li>
             <li><strong className="text-neutral-800">Unsplash</strong> — stock photography for Carousel slide backgrounds.</li>
             <li><strong className="text-neutral-800">Resend</strong> — transactional email.</li>
             <li><strong className="text-neutral-800">Razorpay</strong> — payment processing.</li>
