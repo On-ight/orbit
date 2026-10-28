@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { ContactShadows, Environment, Float, Lightformer, useAnimations, useGLTF } from "@react-three/drei";
 import { Box3, Vector3, type Group } from "three";
 import { MODEL_URL, type MascotPose, type Mood } from "@/components/marketing/mascot-pose";
@@ -9,20 +9,40 @@ import { MODEL_URL, type MascotPose, type Mood } from "@/components/marketing/ma
 // Whatever size/origin the Blender export has, normalize it to this height
 // (world units) and center it, so re-exporting never needs camera tweaks.
 const TARGET_HEIGHT = 2.6;
+// Must match <Canvas camera={{ position: [0, 0, CAMERA_DISTANCE], fov: CAMERA_FOV }}>.
+const CAMERA_DISTANCE = 6;
+const CAMERA_FOV_DEG = 30;
+// Leaves room for the head's yaw turn (±0.55 rad) so the ears don't swing
+// into the edge of a narrow (portrait) canvas as the mascot looks around.
+const WIDTH_SAFETY_MARGIN = 0.8;
 
 function Model({ poseRef }: { poseRef: RefObject<MascotPose> }) {
   const { scene, animations } = useGLTF(MODEL_URL);
   const group = useRef<Group>(null);
   const { actions, names } = useAnimations(animations, group);
   const [mood, setMood] = useState<Mood>("idle");
+  const { width: viewportWidth, height: viewportHeight } = useThree((state) => state.size);
 
   const fit = useMemo(() => {
     const box = new Box3().setFromObject(scene);
     const size = box.getSize(new Vector3());
     const center = box.getCenter(new Vector3());
-    const scale = TARGET_HEIGHT / size.y;
+    const heightScale = TARGET_HEIGHT / size.y;
+
+    // Fitting to height alone assumes a square-ish viewport. The mascot's
+    // stage is portrait (narrower than it is tall), so the horizontal field
+    // of view at the same fov is narrower than the vertical one — scaling
+    // only for height let the ears poke past the left/right edge. Clamp the
+    // scale to the model's actual horizontal footprint too.
+    const vFov = (CAMERA_FOV_DEG * Math.PI) / 180;
+    const visibleHeight = 2 * CAMERA_DISTANCE * Math.tan(vFov / 2);
+    const visibleWidth = visibleHeight * (viewportWidth / viewportHeight);
+    const footprint = Math.hypot(size.x, size.z); // safe through the yaw turn, not just at rest
+    const widthScale = (visibleWidth * WIDTH_SAFETY_MARGIN) / footprint;
+
+    const scale = Math.min(heightScale, widthScale);
     return { scale, offset: center.multiplyScalar(-scale) };
-  }, [scene]);
+  }, [scene, viewportWidth, viewportHeight]);
 
   // Blender Actions export as clips; any whose name contains the mood word
   // (e.g. "Mischievous", "orbit_sleepy") gets cross-faded in. Models with no
@@ -53,7 +73,11 @@ function Model({ poseRef }: { poseRef: RefObject<MascotPose> }) {
 
 export default function MascotModel({ poseRef }: { poseRef: RefObject<MascotPose> }) {
   return (
-    <Canvas dpr={[1, 2]} camera={{ position: [0, 0, 6], fov: 30 }} gl={{ alpha: true, antialias: true }}>
+    <Canvas
+      dpr={[1, 2]}
+      camera={{ position: [0, 0, CAMERA_DISTANCE], fov: CAMERA_FOV_DEG }}
+      gl={{ alpha: true, antialias: true }}
+    >
       <ambientLight intensity={0.6} />
       <directionalLight position={[3, 4, 5]} intensity={1.6} />
       {/* Purple rim lights to match the antenna orbs and halo. */}
