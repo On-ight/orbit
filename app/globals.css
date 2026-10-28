@@ -86,3 +86,21 @@ body {
   color: var(--text-primary);
   font-family: var(--font-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
 }
+
+/* Landing hero floating cards. Uses `translate` (not `transform`) so it
+   composes with each card's own 3D tilt instead of overwriting it. */
+@keyframes hero-float {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-\[hero-float_6s_ease-in-out_infinite\] {
+    animation: none;
+  }
+}
