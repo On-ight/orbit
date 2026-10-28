@@ -1,6 +1,39 @@
 import Link from "next/link";
 import { ApprovalQueueDemo } from "@/components/marketing/ApprovalQueueDemo";
 import { DashboardPreview } from "@/components/marketing/DashboardPreview";
+import { OrbitMascot } from "@/components/marketing/OrbitMascot";
+
+function HeroCard({
+  className,
+  delay,
+  tag,
+  text,
+  action,
+}: {
+  className: string;
+  delay: string;
+  tag: string;
+  text: string;
+  action?: boolean;
+}) {
+  return (
+    <div className={`pointer-events-none absolute z-10 hidden w-60 [perspective:800px] lg:block ${className}`}>
+      <div
+        className="animate-[hero-float_6s_ease-in-out_infinite] rounded-2xl border border-white/80 bg-white/70 p-4 shadow-[0_24px_50px_-20px_rgba(98,41,206,0.45),inset_0_1px_0_white] backdrop-blur-md [transform:rotateY(var(--tilt))_rotateX(6deg)]"
+        style={{ animationDelay: delay }}
+      >
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">{tag}</p>
+        <p className="mt-1.5 text-sm leading-snug text-neutral-800">{text}</p>
+        {action && (
+          <div className="mt-3 flex gap-2">
+            <span className="rounded-md bg-[#8e42fc] px-2.5 py-1 text-xs font-medium text-white">Approve</span>
+            <span className="rounded-md bg-[#f1ecfa] px-2.5 py-1 text-xs font-medium text-[#6229ce]">Edit</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 const SEGMENTS = [
   {
@@ -100,8 +133,52 @@ export default function LandingPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
       />
 
+      {/* Opening screen — just Orbit, filling the first view */}
+      <section className="relative overflow-hidden bg-[radial-gradient(ellipse_at_top,#f1e8ff_0%,#ffffff_60%)]">
+        {/* Perspective grid floor — gives the mascot something to stand on */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-[-50%] bottom-0 h-[45%] origin-bottom [transform:perspective(600px)_rotateX(62deg)] bg-[linear-gradient(to_right,rgba(142,66,252,0.18)_1px,transparent_1px),linear-gradient(to_bottom,rgba(142,66,252,0.18)_1px,transparent_1px)] bg-[size:56px_56px] [mask-image:linear-gradient(to_top,black_10%,transparent_85%)]"
+        />
+
+        <div className="relative mx-auto flex min-h-[calc(100svh-77px)] max-w-6xl flex-col justify-center px-6">
+          <div className="relative">
+            <OrbitMascot className="h-[min(72svh,680px)]" />
+
+            {/* Floating drafts around Orbit — illustrative, mirrors the approval queue below */}
+            <HeroCard
+              className="left-0 top-10 [--tilt:18deg]"
+              delay="0s"
+              tag="🟢 Auto · X"
+              text="Shipped onboarding v2 — drafted & scheduled."
+            />
+            <HeroCard
+              className="right-0 top-24 [--tilt:-18deg]"
+              delay="1.2s"
+              tag="🟡 Needs your yes · LinkedIn"
+              text="What we learned rebuilding onboarding this quarter…"
+              action
+            />
+            <HeroCard
+              className="bottom-16 left-6 [--tilt:14deg]"
+              delay="2.4s"
+              tag="Threads · queued"
+              text="Friday build-in-public recap is ready."
+            />
+          </div>
+
+          <a
+            href="#intro"
+            className="absolute bottom-6 left-1/2 flex -translate-x-1/2 flex-col items-center gap-1 text-xs font-medium uppercase tracking-widest text-[#6229ce]/70 transition hover:text-[#6229ce]"
+          >
+            Scroll
+            <span className="animate-bounce text-base">↓</span>
+          </a>
+        </div>
+      </section>
+
       {/* Hero */}
-      <section className="mx-auto max-w-6xl px-6 py-20 md:py-28">
+      <section id="intro" className="mx-auto max-w-6xl px-6 py-20 md:py-28">
         <div className="grid items-center gap-14 md:grid-cols-2">
           <div>
             <p className="text-sm font-medium uppercase tracking-widest text-neutral-500">AI marketing agent</p>
